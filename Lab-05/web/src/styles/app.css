@@ -1,0 +1,30 @@
+/* Northbound app chrome — the prototype's second stylesheet.
+   The rail items, tab pills, bubble entry animation, scrollbars and range
+   input. All values come from organic.css tokens.
+
+   One deviation from the prototype, marked inline below: its rail items were
+   <button>s carrying aria-current="true". Ours are real links, and the
+   correct ARIA value for "this is the page you are on" is "page". Both are
+   matched so the stylesheet stays true to the reference either way. */
+
+html,body{height:100%}
+body{margin:0}
+.nb-rail-item{display:block;width:100%;text-align:left;border:1px solid transparent;background:transparent;cursor:pointer;font-family:var(--font-body);border-radius:999px;padding:9px 16px;color:var(--color-text);text-decoration:none}
+.nb-rail-item:hover{background:var(--color-accent-100)}
+/* deviation: [aria-current="page"] added for link-based navigation */
+.nb-rail-item[aria-current="true"],
+.nb-rail-item[aria-current="page"]{background:var(--color-accent);color:var(--color-bg)}
+.nb-rail-sub{color:var(--color-neutral-600)}
+.nb-rail-item[aria-current="true"] .nb-rail-sub,
+.nb-rail-item[aria-current="page"] .nb-rail-sub{color:var(--color-accent-100)}
+.nb-tab{border:0;background:transparent;cursor:pointer;font-family:var(--font-body);font-size:13px;padding:7px 14px;border-radius:999px;color:var(--color-neutral-700)}
+.nb-tab:hover{background:var(--color-neutral-300)}
+.nb-tab[aria-selected="true"]{background:var(--color-neutral-900);color:var(--color-neutral-100)}
+.nb-bub{animation:nbIn .32s cubic-bezier(.2,.8,.2,1) both}
+@keyframes nbIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.nb-scroll::-webkit-scrollbar{width:8px}
+.nb-scroll::-webkit-scrollbar-thumb{background:var(--color-neutral-400);border-radius:999px}
+.nb-range{-webkit-appearance:none;appearance:none;height:4px;border-radius:999px;background:var(--color-neutral-600);flex:1}
+.nb-range::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:999px;background:var(--color-accent);border:2px solid var(--color-neutral-900);cursor:pointer}
+a{color:var(--color-accent-700)}
+a:hover{color:var(--color-accent)}

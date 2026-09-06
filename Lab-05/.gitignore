@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------------------
+# Secrets. Nothing in this block is ever committed.
+# ---------------------------------------------------------------------------
+# `.env` holds the real OPENAI_API_KEY, BRAVE_API_KEY, EXA_API_KEY and
+# CLERK_SECRET_KEY. `.env.example` is the committed template and is the one
+# deliberate exception — keep it free of live values.
+#
+# The `.env.*` glob is what catches the variants that get created by hand
+# later (.env.production, .env.staging, web/.env.local). Listing only `.env`
+# is how a key eventually ships: someone copies it to a new suffix and the
+# old rule does not reach.
+.env
+.env.*
+*.env
+!.env.example
+
+# Anything a credential tends to land in.
+*.pem
+*.key
+*.p12
+secrets.json
+service-account*.json
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---------------------------------------------------------------------------
+# Web
+# ---------------------------------------------------------------------------
+web/node_modules/
+web/dist/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Runtime state
+# ---------------------------------------------------------------------------
+# Mock data is re-seeded from mocks/seeds/ on first run, or via /api/reset.
+# The seeds are committed; the working copy under mocks/data/ is not.
+mocks/data/
+
+# ---------------------------------------------------------------------------
+# Local-only artefacts
+# ---------------------------------------------------------------------------
+# Single-line ~344KB export from the design tool, with fonts and images
+# inlined as base64. The real UI is web/src; this is a reference snapshot and
+# would sit in the history forever.
+Northbound Prototype.html
+
+DEMO_SCRIPT*
+slide*
+
+.DS_Store
+*.swp
+*.log
+.idea/
+.vscode/
