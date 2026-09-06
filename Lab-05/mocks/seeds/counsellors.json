@@ -1,0 +1,30 @@
+{
+  "c_001": {
+    "counsellor_id": "c_001",
+    "name": "Priya Raman",
+    "email": "priya.raman@northbound.example",
+    "countries": ["UK", "Ireland"],
+    "active": true
+  },
+  "c_002": {
+    "counsellor_id": "c_002",
+    "name": "Daniel Okafor",
+    "email": "daniel.okafor@northbound.example",
+    "countries": ["Australia", "New Zealand"],
+    "active": true
+  },
+  "c_003": {
+    "counsellor_id": "c_003",
+    "name": "Mei Lin Tan",
+    "email": "meilin.tan@northbound.example",
+    "countries": ["Canada"],
+    "active": true
+  },
+  "c_004": {
+    "counsellor_id": "c_004",
+    "name": "Stefan Brandt",
+    "email": "stefan.brandt@northbound.example",
+    "countries": ["Germany", "Netherlands"],
+    "active": false
+  }
+}
