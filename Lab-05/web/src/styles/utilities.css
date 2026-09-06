@@ -1,0 +1,22 @@
+/* Imported last so utilities out-rank the Organic component classes. */
+
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* The monospace run used for figures the reader compares column to column
+     — fees, fit scores, caseload counts, was/now diffs. The prototype writes
+     this stack inline in a dozen places; it is one class here. */
+  .figure {
+    font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Section kicker — the 10.5px uppercase label above every card group. */
+  .kicker {
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-neutral-600);
+  }
+}

@@ -1,0 +1,40 @@
+[project]
+name = "northbound-student-agent"
+version = "0.1.0"
+description = "Northbound student-facing agent — declarative profile, typed MCP servers, skills, episodic + conversation memory, Postgres-backed."
+requires-python = ">=3.11"
+dependencies = [
+    "strands-agents>=1.40.0",
+    "openai>=2.37.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0.0",
+
+    # v2-specific: MCP subprocesses (policy_kb, customer_support) and the
+    # declarative agent-profile.yaml the harness reads at startup.
+    "mcp>=1.0.0",
+    "pyyaml>=6.0",
+
+    # HTTP shell — same FastAPI / SSE wire as cs_agent_v1.
+    "fastapi>=0.136.1",
+    "uvicorn[standard]>=0.27.0",
+    "sse-starlette>=2.0.0",
+
+    # Postgres. psycopg 3 is the driver SQLAlchemy 2 targets; the [binary]
+    # extra ships wheels so no local libpq or compiler is needed.
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+    "alembic>=1.13",
+]
+
+[project.optional-dependencies]
+# Schema tests. Install with:  pip install -e ".[dev]"
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
