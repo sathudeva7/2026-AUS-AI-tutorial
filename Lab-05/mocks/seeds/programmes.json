@@ -1,0 +1,782 @@
+{
+  "p_uk_001": {
+    "programme_id": "p_uk_001",
+    "institution": "Camden Metropolitan University",
+    "country": "UK",
+    "city": "London",
+    "name": "MSc Data Science",
+    "level": "masters",
+    "field": "data science",
+    "tuition_per_year": 24500.0,
+    "currency": "GBP",
+    "duration_months": 12,
+    "intakes": ["2027-01", "2027-09"],
+    "application_deadline": "2027-06-30",
+    "verified_at": "2026-08-14",
+    "requirements": [
+      {
+        "requirement_id": "p_uk_001_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=4",
+        "description": "A four-year bachelor's degree in a quantitative subject.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_001_r2",
+        "key": "grades",
+        "rule": "percentage>=65",
+        "description": "A UK 2:1 or international equivalent (65% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_001_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_001_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_001_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_uk_002": {
+    "programme_id": "p_uk_002",
+    "institution": "Riverford University",
+    "country": "UK",
+    "city": "Manchester",
+    "name": "MSc Applied Data Analytics",
+    "level": "masters",
+    "field": "data science",
+    "tuition_per_year": 21000.0,
+    "currency": "GBP",
+    "duration_months": 12,
+    "intakes": ["2027-09"],
+    "application_deadline": "2027-07-15",
+    "verified_at": "2026-08-14",
+    "requirements": [
+      {
+        "requirement_id": "p_uk_002_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=3",
+        "description": "A three-year bachelor's degree is accepted for this programme.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_002_r2",
+        "key": "grades",
+        "rule": "percentage>=60",
+        "description": "A UK 2:2 or international equivalent (60% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_002_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_002_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_002_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_uk_003": {
+    "programme_id": "p_uk_003",
+    "institution": "Thameside University",
+    "country": "UK",
+    "city": "Leeds",
+    "name": "MSc Artificial Intelligence",
+    "level": "masters",
+    "field": "data science",
+    "tuition_per_year": 26800.0,
+    "currency": "GBP",
+    "duration_months": 12,
+    "intakes": ["2027-09"],
+    "application_deadline": "2027-05-31",
+    "verified_at": "2026-08-14",
+    "requirements": [
+      {
+        "requirement_id": "p_uk_003_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=3",
+        "description": "A three-year bachelor's degree in computing or mathematics.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_003_r2",
+        "key": "grades",
+        "rule": "percentage>=70",
+        "description": "A strong 2:1 or international equivalent (70% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_003_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_003_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_003_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_uk_004": {
+    "programme_id": "p_uk_004",
+    "institution": "Northgate University",
+    "country": "UK",
+    "city": "Bristol",
+    "name": "MSc Computer Science (Conversion)",
+    "level": "masters",
+    "field": "computer science",
+    "tuition_per_year": 22400.0,
+    "currency": "GBP",
+    "duration_months": 12,
+    "intakes": ["2027-01", "2027-09"],
+    "application_deadline": "2027-07-01",
+    "verified_at": "2026-08-14",
+    "requirements": [
+      {
+        "requirement_id": "p_uk_004_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=3",
+        "description": "Any three-year bachelor's degree; no computing background required.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_004_r2",
+        "key": "grades",
+        "rule": "percentage>=60",
+        "description": "A UK 2:2 or international equivalent (60% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_004_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.0",
+        "description": "IELTS 6.0 overall with no band below 5.5.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_004_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_004_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_uk_005": {
+    "programme_id": "p_uk_005",
+    "institution": "Camden Metropolitan University",
+    "country": "UK",
+    "city": "London",
+    "name": "MSc Business Analytics",
+    "level": "masters",
+    "field": "business analytics",
+    "tuition_per_year": 25000.0,
+    "currency": "GBP",
+    "duration_months": 12,
+    "intakes": ["2027-09"],
+    "application_deadline": "2027-06-30",
+    "verified_at": "2026-08-14",
+    "requirements": [
+      {
+        "requirement_id": "p_uk_005_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=3",
+        "description": "A three-year bachelor's degree in any discipline.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_005_r2",
+        "key": "grades",
+        "rule": "percentage>=65",
+        "description": "A UK 2:1 or international equivalent (65% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_005_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_005_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_uk_005_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_au_001": {
+    "programme_id": "p_au_001",
+    "institution": "Port Phillip University",
+    "country": "Australia",
+    "city": "Melbourne",
+    "name": "Master of Data Science",
+    "level": "masters",
+    "field": "data science",
+    "tuition_per_year": 46000.0,
+    "currency": "AUD",
+    "duration_months": 24,
+    "intakes": ["2027-02", "2027-07"],
+    "application_deadline": "2026-11-30",
+    "verified_at": "2026-08-20",
+    "requirements": [
+      {
+        "requirement_id": "p_au_001_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=3",
+        "description": "A three-year bachelor's degree in a cognate discipline.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_001_r2",
+        "key": "grades",
+        "rule": "percentage>=65",
+        "description": "A weighted average of 65% or above.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_001_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_001_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_001_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_au_002": {
+    "programme_id": "p_au_002",
+    "institution": "Darling Harbour Institute of Technology",
+    "country": "Australia",
+    "city": "Sydney",
+    "name": "Master of Information Technology",
+    "level": "masters",
+    "field": "computer science",
+    "tuition_per_year": 43500.0,
+    "currency": "AUD",
+    "duration_months": 24,
+    "intakes": ["2027-02", "2027-07"],
+    "application_deadline": "2026-12-15",
+    "verified_at": "2026-08-20",
+    "requirements": [
+      {
+        "requirement_id": "p_au_002_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=3",
+        "description": "A three-year bachelor's degree in any discipline.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_002_r2",
+        "key": "grades",
+        "rule": "percentage>=60",
+        "description": "A weighted average of 60% or above.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_002_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_002_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_002_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_au_003": {
+    "programme_id": "p_au_003",
+    "institution": "Swan River University",
+    "country": "Australia",
+    "city": "Perth",
+    "name": "Master of Business Analytics",
+    "level": "masters",
+    "field": "business analytics",
+    "tuition_per_year": 39800.0,
+    "currency": "AUD",
+    "duration_months": 18,
+    "intakes": ["2027-02"],
+    "application_deadline": "2026-11-15",
+    "verified_at": "2026-08-20",
+    "requirements": [
+      {
+        "requirement_id": "p_au_003_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=3",
+        "description": "A three-year bachelor's degree in any discipline.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_003_r2",
+        "key": "grades",
+        "rule": "percentage>=65",
+        "description": "A weighted average of 65% or above.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_003_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_003_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_003_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_au_004": {
+    "programme_id": "p_au_004",
+    "institution": "Moreton Bay University",
+    "country": "Australia",
+    "city": "Brisbane",
+    "name": "Master of Cybersecurity",
+    "level": "masters",
+    "field": "computer science",
+    "tuition_per_year": 41200.0,
+    "currency": "AUD",
+    "duration_months": 18,
+    "intakes": ["2027-02", "2027-07"],
+    "application_deadline": "2026-12-01",
+    "verified_at": "2026-08-20",
+    "requirements": [
+      {
+        "requirement_id": "p_au_004_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=4",
+        "description": "A four-year bachelor's degree in computing or engineering.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_004_r2",
+        "key": "grades",
+        "rule": "percentage>=70",
+        "description": "A weighted average of 70% or above.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_004_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_004_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_au_004_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_ca_001": {
+    "programme_id": "p_ca_001",
+    "institution": "Fraser Valley Polytechnic",
+    "country": "Canada",
+    "city": "Vancouver",
+    "name": "Master of Data Analytics",
+    "level": "masters",
+    "field": "data science",
+    "tuition_per_year": 32000.0,
+    "currency": "CAD",
+    "duration_months": 20,
+    "intakes": ["2027-01", "2027-09"],
+    "application_deadline": "2027-03-01",
+    "verified_at": "2026-08-22",
+    "requirements": [
+      {
+        "requirement_id": "p_ca_001_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=4",
+        "description": "A four-year bachelor's degree from a recognised institution.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_001_r2",
+        "key": "grades",
+        "rule": "percentage>=70",
+        "description": "A B+ average or international equivalent (70% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_001_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_001_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_001_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_ca_002": {
+    "programme_id": "p_ca_002",
+    "institution": "Rideau University",
+    "country": "Canada",
+    "city": "Ottawa",
+    "name": "Master of Public Health",
+    "level": "masters",
+    "field": "public health",
+    "tuition_per_year": 28500.0,
+    "currency": "CAD",
+    "duration_months": 24,
+    "intakes": ["2027-09"],
+    "application_deadline": "2027-02-01",
+    "verified_at": "2026-08-22",
+    "requirements": [
+      {
+        "requirement_id": "p_ca_002_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=4",
+        "description": "A four-year bachelor's degree in health or life sciences.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_002_r2",
+        "key": "grades",
+        "rule": "percentage>=70",
+        "description": "A B+ average or international equivalent (70% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_002_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=7.0",
+        "description": "IELTS 7.0 overall with no band below 6.5.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_002_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_002_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_ca_003": {
+    "programme_id": "p_ca_003",
+    "institution": "Lakeshore University",
+    "country": "Canada",
+    "city": "Toronto",
+    "name": "MSc Computer Science",
+    "level": "masters",
+    "field": "computer science",
+    "tuition_per_year": 34000.0,
+    "currency": "CAD",
+    "duration_months": 24,
+    "intakes": ["2027-01", "2027-09"],
+    "application_deadline": "2027-02-15",
+    "verified_at": "2026-08-22",
+    "requirements": [
+      {
+        "requirement_id": "p_ca_003_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=4",
+        "description": "A four-year bachelor's degree in computing or a related field.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_003_r2",
+        "key": "grades",
+        "rule": "percentage>=75",
+        "description": "An A- average or international equivalent (75% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_003_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall with no band below 6.0.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_003_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_ca_003_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_de_001": {
+    "programme_id": "p_de_001",
+    "institution": "Rheinland Technical University",
+    "country": "Germany",
+    "city": "Aachen",
+    "name": "MSc Mechanical Engineering",
+    "level": "masters",
+    "field": "mechanical engineering",
+    "tuition_per_year": 1500.0,
+    "currency": "EUR",
+    "duration_months": 24,
+    "intakes": ["2027-04", "2027-10"],
+    "application_deadline": "2027-01-15",
+    "verified_at": "2026-08-25",
+    "requirements": [
+      {
+        "requirement_id": "p_de_001_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=4",
+        "description": "A four-year bachelor's degree in mechanical or production engineering.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_001_r2",
+        "key": "grades",
+        "rule": "percentage>=75",
+        "description": "A German grade of 2.5 or better (75% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_001_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall for the English-taught track.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_001_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_001_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_de_002": {
+    "programme_id": "p_de_002",
+    "institution": "Hansestadt University of Applied Sciences",
+    "country": "Germany",
+    "city": "Hamburg",
+    "name": "MSc Automotive Systems",
+    "level": "masters",
+    "field": "mechanical engineering",
+    "tuition_per_year": 1200.0,
+    "currency": "EUR",
+    "duration_months": 18,
+    "intakes": ["2027-10"],
+    "application_deadline": "2027-03-31",
+    "verified_at": "2026-08-25",
+    "requirements": [
+      {
+        "requirement_id": "p_de_002_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=4",
+        "description": "A four-year bachelor's degree in engineering.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_002_r2",
+        "key": "grades",
+        "rule": "percentage>=70",
+        "description": "A German grade of 3.0 or better (70% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_002_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.0",
+        "description": "IELTS 6.0 overall for the English-taught track.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_002_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_002_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  },
+  "p_de_003": {
+    "programme_id": "p_de_003",
+    "institution": "Bavarian Institute of Technology",
+    "country": "Germany",
+    "city": "Munich",
+    "name": "MSc Production Engineering",
+    "level": "masters",
+    "field": "mechanical engineering",
+    "tuition_per_year": 2000.0,
+    "currency": "EUR",
+    "duration_months": 24,
+    "intakes": ["2027-04", "2027-10"],
+    "application_deadline": "2027-02-28",
+    "verified_at": "2026-08-25",
+    "requirements": [
+      {
+        "requirement_id": "p_de_003_r1",
+        "key": "qualification",
+        "rule": "bachelor_years>=4",
+        "description": "A four-year bachelor's degree in engineering.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_003_r2",
+        "key": "grades",
+        "rule": "percentage>=70",
+        "description": "A German grade of 3.0 or better (70% and above).",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_003_r3",
+        "key": "english_test",
+        "rule": "ielts_overall>=6.5",
+        "description": "IELTS 6.5 overall for the English-taught track.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_003_r4",
+        "key": "intended_intake",
+        "rule": "intake_in_programme_intakes",
+        "description": "The intake you are applying for must be open.",
+        "mandatory": true
+      },
+      {
+        "requirement_id": "p_de_003_r5",
+        "key": "budget_per_year",
+        "rule": "tuition_per_year<=budget_per_year",
+        "description": "Annual tuition must sit within your stated budget.",
+        "mandatory": false
+      }
+    ]
+  }
+}

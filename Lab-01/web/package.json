@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5173 --host",
-    "build": "tsc -b && vite build",
+    "dev": "node init && vite --port 5173 --host",
+    "build": "node init && tsc -b && vite build",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {

@@ -1,0 +1,17 @@
+/* Tailwind's preflight only. It is imported BEFORE organic.css so the design
+   system's own base rules (body ground, heading faces, link colour, focus
+   ring) win over the reset rather than being flattened by it.
+
+   The utilities live in utilities.css, imported LAST, so a Tailwind class
+   always beats an Organic component class of the same specificity. Changing
+   that import order in main.tsx silently inverts the cascade. */
+
+@tailwind base;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+}

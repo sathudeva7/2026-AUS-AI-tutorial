@@ -4,7 +4,6 @@ __pycache__/
 .venv/
 venv/
 build/
-.env
 .DS_Store
 
 # Python tooling caches
@@ -20,7 +19,6 @@ dist/
 
 # Editor
 .idea/
-.vscode/
 *.log
 *.swp
 
@@ -33,3 +31,4 @@ memory/customer_*.md
 
 seed/
 labs/
+config.bat
