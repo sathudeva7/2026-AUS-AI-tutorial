@@ -24,10 +24,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
-import phonenumbers
-import pycountry
 
 # Lab root on sys.path so `mocks` and `mcp_servers` resolve — they live one
 # level up, shared with the counsellor agent.
@@ -36,18 +33,18 @@ if str(_LAB_ROOT) not in sys.path:
     sys.path.insert(0, str(_LAB_ROOT))
 
 from dotenv import load_dotenv  # noqa: E402
-from fastapi import Depends, FastAPI, HTTPException  # noqa: E402
+from fastapi import Depends, FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from pydantic import BaseModel, Field, field_validator  # noqa: E402
-from sqlalchemy import text  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 from sse_starlette.sse import EventSourceResponse  # noqa: E402
 from strands import Agent  # noqa: E402
 from strands.models.openai import OpenAIModel  # noqa: E402
 
 from agent.core import ROOT, build_agent, prepend_context  # noqa: E402
-from auth import Principal, require_auth, require_permission  # noqa: E402
-from db import engine  # noqa: E402
-from permissions import effective_permissions  # noqa: E402
+import envelope  # noqa: E402
+from api import me as me_routes, tenant as tenant_routes  # noqa: E402
+from auth import Principal, require_permission  # noqa: E402
+from envelope import ApiError, EnvelopeRoute  # noqa: E402
 from agent.hooks import sanitise_student_text  # noqa: E402
 from agent import facts as facts_module, planner as planner_module, pricing  # noqa: E402
 from agent.planner import format_history, format_tool_specs, plan_for_prompt  # noqa: E402
@@ -390,6 +387,12 @@ class RunRequest(BaseModel):
 
 app = FastAPI(title="northbound_student", version="0.1.0")
 
+# One response shape for the whole API. `install` adds the request id and the
+# error handlers; the route class wraps successful returns in `data`.
+# See envelope.py for why this is not a body-rewriting middleware.
+app.router.route_class = EnvelopeRoute
+envelope.install(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):51(7[0-9]|8[0-9])",
@@ -401,7 +404,15 @@ app.add_middleware(
     # A browser silently drops a header the server does not allow, so an
     # omission here looks like "the token is being ignored".
     allow_headers=["Content-Type", "Authorization"],
+    # Without this the browser hides the header entirely, so a failure the
+    # user reports cannot be matched to a line in the server log.
+    expose_headers=["X-Request-Id"],
 )
+
+# Routes live in api/. Each router is built by api.new_router so it carries
+# EnvelopeRoute — include_router does NOT inherit the app's route class.
+app.include_router(me_routes.router)
+app.include_router(tenant_routes.router)
 
 
 @app.get("/health")
@@ -413,213 +424,6 @@ def health() -> dict[str, Any]:
         "role": PROFILE.role,
         "workspace": PROFILE.workspace,
     }
-
-
-@app.get("/api/me")
-def me(principal: Principal = Depends(require_auth)) -> dict[str, Any]:
-    """The caller, their agency and everything they may do.
-
-    Also the endpoint that provisions a brand-new agency: the first request
-    after signing up creates the tenant row and the owner. The frontend calls
-    it on load, so provisioning happens before anything needs it.
-    """
-    return {
-        "tenant_id": principal.tenant_id,
-        "user_id": principal.user_id,
-        "role": principal.role,
-        "permissions": sorted(effective_permissions(principal.role, principal.grants)),
-    }
-
-
-# ---------------------------------------------------------------------------
-# Agency details
-# ---------------------------------------------------------------------------
-# Deliberately NOT collected at signup. CreateAgencyRoute asks only for a name
-# — everything else is configuration and belongs in the console, where there is
-# an agency to attach it to and context for what the fields are for.
-
-
-class TenantOut(BaseModel):
-    id: str
-    name: str
-    phone: str | None = None
-    address_line1: str | None = None
-    address_line2: str | None = None
-    city: str | None = None
-    region: str | None = None
-    postal_code: str | None = None
-    country: str | None = None
-    default_timezone: str
-    active: bool
-    #: The phone's country and national part, resolved by libphonenumber
-    #: rather than guessed from the dialling code. Eleven dialling codes are
-    #: shared between countries — +44 covers Guernsey, Jersey, the Isle of Man
-    #: and the UK, and +1 covers twenty-five — so a prefix match cannot tell
-    #: them apart. The library can, and it already parsed this number on the
-    #: way in.
-    phone_country: str | None = None
-    phone_national: str | None = None
-    #: True when phone and a usable address are both present. Drives the
-    #: "finish setting up your agency" prompt rather than leaving the fields
-    #: silently empty forever.
-    complete: bool
-
-
-class TenantPatch(BaseModel):
-    """Editable agency details.
-
-    `name` is absent on purpose. It is a CACHE of Clerk's organization name —
-    Clerk is authoritative, and a form that wrote it here would drift until
-    the next sync silently overwrote whatever was typed. Name changes go
-    through Clerk's own OrganizationProfile.
-
-    Validation happens here as well as in the database. The CHECK constraints
-    are the boundary and stay the boundary; this layer exists so a mistyped
-    phone number comes back as a readable 422 instead of a constraint
-    violation surfacing as a 500.
-    """
-
-    phone: str | None = None
-    address_line1: str | None = Field(default=None, max_length=200)
-    address_line2: str | None = Field(default=None, max_length=200)
-    city: str | None = Field(default=None, max_length=100)
-    region: str | None = Field(default=None, max_length=100)
-    postal_code: str | None = Field(default=None, max_length=32)
-    # ISO 3166-1 alpha-2, stored uppercase.
-    country: str | None = None
-    default_timezone: str | None = None
-
-    @field_validator("phone")
-    @classmethod
-    def _valid_phone(cls, v: str | None) -> str | None:
-        """A real number, not merely a plausible-looking one.
-
-        The regex this replaces accepted '+947424059777' — one digit too long
-        for Sri Lanka — and '+9400000000'. libphonenumber knows each country's
-        actual numbering plan. The value is normalised to E.164 on the way in,
-        so '+94 74 240 5977' and '+94742405977' store identically.
-        """
-        if v is None or not v.strip():
-            return None
-        try:
-            parsed = phonenumbers.parse(v.strip(), None)
-        except phonenumbers.NumberParseException:
-            raise ValueError(
-                "Enter the number in international format, starting with + and "
-                "the country code — for example +94771234567."
-            ) from None
-        if not phonenumbers.is_valid_number(parsed):
-            raise ValueError(
-                "That is not a valid number for its country code. Check the digits."
-            )
-        return phonenumbers.format_number(
-            parsed, phonenumbers.PhoneNumberFormat.E164
-        )
-
-    @field_validator("country")
-    @classmethod
-    def _valid_country(cls, v: str | None) -> str | None:
-        """Checked against the ISO 3166 register, not against "two letters".
-
-        'XX' matches the old pattern and is not a country. The frontend sends
-        a code from a dropdown, so a failure here means either a bad client or
-        someone calling the API directly — both of which should be refused.
-        """
-        if v is None or not v.strip():
-            return None
-        code = v.strip().upper()
-        if len(code) != 2 or pycountry.countries.get(alpha_2=code) is None:
-            raise ValueError("Choose a country from the list.")
-        return code
-
-    @field_validator("default_timezone")
-    @classmethod
-    def _known_zone(cls, v: str | None) -> str | None:
-        """An unknown zone would render every time wrong rather than fail."""
-        if v is None:
-            return None
-        try:
-            ZoneInfo(v)
-        except Exception:  # noqa: BLE001
-            raise ValueError(
-                "Not a known timezone. Use an IANA name such as Asia/Colombo."
-            ) from None
-        return v
-
-    @field_validator(
-        "address_line1", "address_line2", "city", "region", "postal_code",
-        mode="before",
-    )
-    @classmethod
-    def _blank_is_null(cls, v: object) -> object:
-        """A cleared form field arrives as "" and means "no value"."""
-        if isinstance(v, str) and not v.strip():
-            return None
-        return v
-
-
-_TENANT_COLUMNS = (
-    "id, name, phone, address_line1, address_line2, city, region,"
-    " postal_code, country, default_timezone, active"
-)
-
-
-def _tenant_row(tenant_id: str) -> TenantOut:
-    with engine().connect() as conn:
-        row = conn.execute(
-            text(f"select {_TENANT_COLUMNS} from tenants where id = :id"),
-            {"id": tenant_id},
-        ).one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="tenant_not_found")
-    data = dict(row._mapping)
-    data["phone_country"] = None
-    data["phone_national"] = None
-    if data["phone"]:
-        try:
-            parsed = phonenumbers.parse(data["phone"], None)
-            data["phone_country"] = phonenumbers.region_code_for_number(parsed)
-            data["phone_national"] = phonenumbers.national_significant_number(parsed)
-        except phonenumbers.NumberParseException:
-            # Stored before this parsed cleanly. Leave both null and let the
-            # form show the raw E.164 rather than dropping the number.
-            pass
-    data["complete"] = bool(
-        data["phone"] and data["address_line1"] and data["city"] and data["country"]
-    )
-    return TenantOut(**data)
-
-
-@app.get("/api/tenant")
-def get_tenant(principal: Principal = Depends(require_auth)) -> TenantOut:
-    """The agency record. Any member may read it — the rail and the widget
-    preview both show the name and city."""
-    return _tenant_row(principal.tenant_id)
-
-
-@app.patch("/api/tenant")
-def patch_tenant(
-    patch: TenantPatch,
-    principal: Principal = Depends(require_permission("tenant.settings")),
-) -> TenantOut:
-    """Update agency details. Owner-only, per the permission catalogue.
-
-    Only fields actually sent are touched, so a form that renders half the
-    record cannot blank the other half by omission.
-    """
-    fields = patch.model_dump(exclude_unset=True)
-    if "country" in fields and fields["country"]:
-        fields["country"] = fields["country"].upper()
-    if not fields:
-        return _tenant_row(principal.tenant_id)
-
-    assignments = ", ".join(f"{k} = :{k}" for k in fields)
-    with engine().begin() as conn:
-        conn.execute(
-            text(f"update tenants set {assignments} where id = :tenant_id"),
-            {**fields, "tenant_id": principal.tenant_id},
-        )
-    return _tenant_row(principal.tenant_id)
 
 
 @app.get("/api/leads")
@@ -676,11 +480,14 @@ def create_lead(req: CreateLeadRequest) -> dict[str, Any]:
     email = req.email.strip()
     name = req.name.strip()
     if not email:
-        raise HTTPException(status_code=422, detail="email is required")
+        raise ApiError(422, "VALIDATION_FAILED", "The provided input contains errors.",
+            details=[{"field": "email", "issue": "An email address is required."}])
     if "@" not in email:
-        raise HTTPException(status_code=422, detail="email must contain '@'")
+        raise ApiError(422, "VALIDATION_FAILED", "The provided input contains errors.",
+            details=[{"field": "email", "issue": "Must be a valid email address."}])
     if not name:
-        raise HTTPException(status_code=422, detail="name is required")
+        raise ApiError(422, "VALIDATION_FAILED", "The provided input contains errors.",
+            details=[{"field": "name", "issue": "A name is required."}])
 
     CLIENT._reload_cache()
     existed = any(

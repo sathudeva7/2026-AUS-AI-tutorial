@@ -30,11 +30,11 @@ from pathlib import Path
 
 import httpx
 import jwt
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, status
 from jwt import PyJWKClient
-from sqlalchemy import text
 
-from db import engine
+from envelope import ApiError
+from repositories import tenants as tenants_repo, users as users_repo
 
 log = logging.getLogger(__name__)
 
@@ -208,9 +208,10 @@ def _provision(claims: dict) -> None:
         emails[0]["email_address"] if emails else None,
     )
     if not email:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="clerk_user_has_no_email",
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "CLERK_USER_HAS_NO_EMAIL",
+            "That account has no email address, so it cannot join an agency.",
         )
 
     name = " ".join(
@@ -221,48 +222,33 @@ def _provision(claims: dict) -> None:
     # question from then on.
     role = _CLERK_ROLE_SEED.get(org_role, "owner")
 
-    with engine().begin() as conn:
-        conn.execute(
-            text(
-                "insert into tenants (id, name) values (:id, :name)"
-                " on conflict (id) do nothing"
-            ),
-            {"id": org_id, "name": org.get("name") or "Untitled agency"},
-        )
-        conn.execute(
-            text(
-                "insert into users"
-                "  (tenant_id, clerk_user_id, email, name, role, status, accepted_at)"
-                " values (:t, :c, :e, :n, :r, 'active', now())"
-                " on conflict (tenant_id, clerk_user_id) do nothing"
-            ),
-            {"t": org_id, "c": clerk_user_id, "e": email, "n": name, "r": role},
-        )
+    tenants_repo.ensure_with_owner(
+        org_id,
+        org.get("name") or "Untitled agency",
+        clerk_user_id=clerk_user_id,
+        email=email,
+        user_name=name,
+        role=role,
+    )
 
 
 def _load(org_id: str, clerk_user_id: str) -> Principal | None:
-    """The caller's row plus their grants, or None if not provisioned yet."""
-    with engine().connect() as conn:
-        row = conn.execute(
-            text(
-                "select id, role from users"
-                " where tenant_id = :t and clerk_user_id = :c and status = 'active'"
-            ),
-            {"t": org_id, "c": clerk_user_id},
-        ).one_or_none()
-        if row is None:
-            return None
-        grants = conn.execute(
-            text("select permission_key from user_permissions where user_id = :u"),
-            {"u": row.id},
-        ).scalars()
-        return Principal(
-            clerk_user_id=clerk_user_id,
-            tenant_id=org_id,
-            user_id=str(row.id),
-            role=row.role,
-            grants=frozenset(grants),
-        )
+    """The caller's row plus their grants, or None if not provisioned yet.
+
+    The SQL is in repositories/users.py; what happens here is the step that
+    layer must not take — turning a row into a Principal, which asserts the
+    identity was PROVED. Only code that has verified a signature may do that.
+    """
+    record = users_repo.find_active(org_id, clerk_user_id)
+    if record is None:
+        return None
+    return Principal(
+        clerk_user_id=clerk_user_id,
+        tenant_id=org_id,
+        user_id=record.id,
+        role=record.role,
+        grants=record.grants,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -278,15 +264,16 @@ def require_auth(authorization: str = Header(default="")) -> Principal:
     """
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="missing_bearer_token",
+        raise ApiError(
+            status.HTTP_401_UNAUTHORIZED,
+            "MISSING_BEARER_TOKEN",
+            "Sign in to continue.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     try:
         claims = verify_token(token)
-    except HTTPException:
+    except ApiError:
         raise
     except Exception as exc:  # noqa: BLE001 — every failure is a refusal
         # Header only: alg/kid/typ. Never the payload, which carries claims
@@ -300,9 +287,10 @@ def require_auth(authorization: str = Header(default="")) -> Principal:
             "token rejected: %s: %s | header=%s len=%d",
             type(exc).__name__, exc, header, len(token),
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid_token",
+        raise ApiError(
+            status.HTTP_401_UNAUTHORIZED,
+            "INVALID_TOKEN",
+            "Your session is not valid. Sign in again.",
             headers={"WWW-Authenticate": "Bearer"},
         ) from None
 
@@ -317,8 +305,10 @@ def require_auth(authorization: str = Header(default="")) -> Principal:
         # Signed in, but no active organization — they have not created or
         # selected an agency. Distinct from "not signed in", so the frontend
         # can send them to /create-agency instead of the sign-in page.
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="no_active_organization"
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN,
+            "NO_ACTIVE_ORGANIZATION",
+            "Signed in, but no agency is selected.",
         )
 
     principal = _load(org_id, claims["sub"])
@@ -326,9 +316,10 @@ def require_auth(authorization: str = Header(default="")) -> Principal:
         _provision(claims)
         principal = _load(org_id, claims["sub"])
     if principal is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="provisioning_failed",
+        raise ApiError(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "PROVISIONING_FAILED",
+            "Your agency could not be set up. Try again.",
         )
     return principal
 
@@ -343,9 +334,13 @@ def require_permission(key: str):
 
     def _dep(principal: Principal = Depends(require_auth)) -> Principal:
         if not has_permission(principal.role, key, principal.grants):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"missing_permission:{key}",
+            raise ApiError(
+                status.HTTP_403_FORBIDDEN,
+                "MISSING_PERMISSION",
+                "You do not have permission to do that.",
+                # The key travels as a detail rather than glued into the
+                # message, so the frontend never splits a string to find it.
+                details=[{"field": "permission", "issue": key}],
             )
         return principal
 

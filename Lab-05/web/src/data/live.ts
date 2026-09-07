@@ -16,16 +16,38 @@ export const AGENT_BASE_URL =
 
 /** Thrown on 401/403 so a surface can send the viewer somewhere useful
  *  rather than rendering "500" at them. */
+/** The API's one response shape.
+ *
+ *   success  { success: true,  data, message?, meta?, request_id }
+ *   failure  { success: false, error: { code, message, details? }, request_id }
+ *
+ * `code` is a stable constant to switch on; `message` is for people. Before
+ * this, 401 returned `detail` as a string and 422 returned it as an array,
+ * so every caller had to guess which it had this time. */
+interface ApiError {
+  code: string;
+  message: string;
+  details?: { field: string; issue: string }[];
+}
+
+interface Envelope<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  meta?: Record<string, unknown>;
+  error?: ApiError;
+  request_id?: string;
+}
+
 export class NotAuthenticatedError extends Error {
   constructor(
     readonly status: number,
-    readonly reason: string,
+    readonly code: string,
+    message: string,
+    /** Quote this when reporting a failure — the same id is in the server log. */
+    readonly requestId?: string,
   ) {
-    super(
-      status === 403 && reason === "no_active_organization"
-        ? "Signed in, but no agency is selected."
-        : "Not signed in, or the session has expired.",
-    );
+    super(message);
     this.name = "NotAuthenticatedError";
   }
 }
@@ -60,27 +82,61 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-/** Turn an auth refusal into a typed error; leave everything else alone. */
-async function raiseForStatus(response: Response, label: string): Promise<void> {
-  if (response.ok) return;
-  if (response.status === 401 || response.status === 403) {
-    let reason = "";
-    try {
-      reason = ((await response.json()) as { detail?: string }).detail ?? "";
-    } catch {
-      // no JSON body; the status is enough
-    }
-    throw new NotAuthenticatedError(response.status, reason);
-  }
-  throw new Error(`${label} returned ${response.status}`);
-}
-
-/** A 422 from the API, split per field so the form can annotate its inputs. */
+/** A validation failure, split per field so the form can annotate its inputs. */
 export class FieldValidationError extends Error {
-  constructor(readonly fields: Record<string, string>) {
-    super(Object.values(fields)[0] ?? "Some details need fixing.");
+  constructor(
+    readonly fields: Record<string, string>,
+    message?: string,
+    readonly requestId?: string,
+  ) {
+    super(message ?? Object.values(fields)[0] ?? "Some details need fixing.");
     this.name = "FieldValidationError";
   }
+}
+
+/** Anything else the API refused. */
+export class ApiRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly requestId?: string,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+/** Unwrap an envelope, or throw the typed error it describes.
+ *
+ * One place, so no caller parses an error body again. Before the envelope,
+ * 401 returned `detail` as a string and 422 returned it as an array, and each
+ * call site had to guess which it had. */
+async function unwrap<T>(response: Response, label: string): Promise<T> {
+  let body: Envelope<T> | null = null;
+  try {
+    body = (await response.json()) as Envelope<T>;
+  } catch {
+    // A non-JSON body — a proxy error page, say. The status still tells us
+    // something, so fall through rather than masking it.
+  }
+
+  if (response.ok && body?.success) return body.data as T;
+
+  const err = body?.error;
+  const rid = body?.request_id;
+  const code = err?.code ?? "ERROR";
+  const message = err?.message ?? `${label} failed (${response.status}).`;
+
+  if (err?.details?.length) {
+    const fields: Record<string, string> = {};
+    for (const d of err.details) fields[d.field] = d.issue;
+    throw new FieldValidationError(fields, message, rid);
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new NotAuthenticatedError(response.status, code, message, rid);
+  }
+  throw new ApiRequestError(response.status, code, message, rid);
 }
 
 export class AgentUnreachableError extends Error {
@@ -103,8 +159,7 @@ async function get<T>(path: string): Promise<T> {
   } catch (cause) {
     throw new AgentUnreachableError(cause);
   }
-  await raiseForStatus(response, `GET ${path}`);
-  return (await response.json()) as T;
+  return unwrap<T>(response, `GET ${path}`);
 }
 
 /** `GET /api/me` — the caller, their agency, and everything they may do.
@@ -171,23 +226,7 @@ export async function patchTenant(
   } catch (cause) {
     throw new AgentUnreachableError(cause);
   }
-  if (response.status === 422) {
-    // Every failing field, keyed by name, so each message can be shown under
-    // the input it concerns. Returning only the first would make a form with
-    // two mistakes take two round-trips to fix.
-    const body = (await response.json()) as {
-      detail?: { loc?: (string | number)[]; msg?: string }[];
-    };
-    const fields: Record<string, string> = {};
-    for (const item of body.detail ?? []) {
-      const field = item.loc?.slice(1).join(".") ?? "_";
-      // Pydantic prefixes custom validator messages with "Value error, ".
-      fields[field] = (item.msg ?? "Invalid value").replace(/^Value error, /, "");
-    }
-    throw new FieldValidationError(fields);
-  }
-  await raiseForStatus(response, "PATCH /api/tenant");
-  return (await response.json()) as Tenant;
+  return unwrap<Tenant>(response, "PATCH /api/tenant");
 }
 
 /** `GET /api/leads` — the lead book. `missing` is what nobody has asked yet. */
