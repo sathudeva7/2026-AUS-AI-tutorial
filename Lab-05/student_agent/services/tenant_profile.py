@@ -12,7 +12,8 @@ from typing import Any, Mapping
 from zoneinfo import ZoneInfo
 
 import phonenumbers
-import pycountry
+
+from services.geo import normalise_country  # noqa: F401  (re-exported)
 
 
 def normalise_phone(raw: str) -> str | None:
@@ -64,22 +65,6 @@ def split_phone(e164: str | None) -> tuple[str | None, str | None]:
         phonenumbers.region_code_for_number(parsed),
         phonenumbers.national_significant_number(parsed),
     )
-
-
-def normalise_country(raw: str) -> str | None:
-    """An ISO 3166-1 code, checked against the register.
-
-    'XX' is two letters and is not a country. The frontend sends a code from a
-    dropdown, so a failure here means either a broken client or someone
-    calling the API directly — both of which should be refused rather than
-    stored.
-    """
-    if not raw or not raw.strip():
-        return None
-    code = raw.strip().upper()
-    if len(code) != 2 or pycountry.countries.get(alpha_2=code) is None:
-        raise ValueError("Choose a country from the list.")
-    return code
 
 
 def check_timezone(name: str) -> str:

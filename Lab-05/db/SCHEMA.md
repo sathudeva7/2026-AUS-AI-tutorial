@@ -119,12 +119,19 @@ as capability.
 | `catalogue.verify` | | ✓ | ✓ | ✓ |
 | `users.edit` | | ✓ | ✓ | ✓ |
 | `users.invite` | | | ✓ | — |
-| `users.countries.manage` | | | ✓ | — |
+| `users.countries.manage` | | ✓ | ✓ | — |
 | `tenant.settings` | | | ✓ | — |
 
-The last three are owner-only and absent from the `user_permissions` CHECK, so
-they cannot be granted individually — that would make someone an owner by the
-back door.
+The last column is a separate question from the first three. `users.invite`,
+`users.countries.manage` and `tenant.settings` are absent from the
+`user_permissions` CHECK and so cannot be granted individually — handing them
+out one at a time is how someone is promoted by the back door.
+
+But not grantable does not mean owner-only. A manager holds
+`users.countries.manage` by role: moving a country when a counsellor goes on
+leave is day-to-day team management, not a tenant-wide setting. The flag in
+`permissions.py` is therefore named `grantable`, after what it actually
+enforces.
 
 Priya as a counsellor granted `catalogue.write` is the case this model exists
 for: she edits programmes without gaining lead visibility, invites or tenant

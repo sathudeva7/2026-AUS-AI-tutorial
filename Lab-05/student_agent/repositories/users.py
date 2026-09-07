@@ -190,3 +190,71 @@ def set_role(tenant_id: str, user_id: str, role: str) -> None:
                  " where tenant_id = :t and id = :u and role <> :r"),
             {"t": tenant_id, "u": user_id, "r": role},
         )
+
+
+def set_countries(tenant_id: str, user_id: str, countries: Sequence[str]) -> None:
+    """Replace this user's routing ownership, preserving what did not change.
+
+    A diff, not a delete-and-reinsert. `assigned_at` is what answers "who
+    owned UK in March?" — the reason this is a table rather than an array on
+    users — and replacing every row wholesale resets that date on countries
+    nobody touched, destroying the history silently.
+
+    One transaction: a user owning nothing for the instant between the delete
+    and the insert would route leads to the unassigned queue.
+    """
+    wanted = set(countries)
+    with engine().begin() as conn:
+        current = set(
+            conn.execute(
+                text("select country from user_countries"
+                     " where tenant_id = :t and user_id = :u"),
+                {"t": tenant_id, "u": user_id},
+            ).scalars()
+        )
+        removed, added = current - wanted, wanted - current
+        if removed:
+            conn.execute(
+                text("delete from user_countries"
+                     " where tenant_id = :t and user_id = :u"
+                     "   and country = any(:cs)"),
+                {"t": tenant_id, "u": user_id, "cs": sorted(removed)},
+            )
+        for country in sorted(added):
+            conn.execute(
+                text("insert into user_countries (tenant_id, user_id, country)"
+                     " values (:t, :u, :c)"),
+                {"t": tenant_id, "u": user_id, "c": country},
+            )
+
+
+#: What PATCH /api/users/{id} may write.
+#:
+#: Absent on purpose: `email` and `clerk_user_id` are identity — changing
+#: either breaks the link to Clerk and the email match that claims an invited
+#: row. `role` belongs to Clerk. `status` has its own endpoint, because
+#: deactivating someone is not a field edit.
+WRITABLE = frozenset({"name", "work_phone", "timezone"})
+
+
+def update(tenant_id: str, user_id: str, fields: dict[str, Any]) -> None:
+    """Write only the columns given, leaving the rest alone.
+
+    Column names are interpolated into the statement — they cannot be bound as
+    parameters — so they are checked against WRITABLE first. Today they arrive
+    from a Pydantic model that already refuses anything else; the check is
+    here so that stays true whoever calls this next.
+    """
+    unknown = set(fields) - WRITABLE
+    if unknown:
+        raise ValueError(f"not writable: {sorted(unknown)}")
+    if not fields:
+        return
+
+    assignments = ", ".join(f"{k} = :{k}" for k in fields)
+    with engine().begin() as conn:
+        conn.execute(
+            text(f"update users set {assignments}"
+                 " where tenant_id = :tenant_id and id = :user_id"),
+            {**fields, "tenant_id": tenant_id, "user_id": user_id},
+        )

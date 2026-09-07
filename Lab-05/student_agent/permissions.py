@@ -30,10 +30,14 @@ Role = str  # 'counsellor' | 'manager' | 'owner' — CHECKed in the database
 class Permission:
     key: str
     description: str
-    #: Owner-only keys are never individually grantable. Granting them
-    #: piecemeal would make someone an owner by the back door, so the
-    #: user_permissions CHECK does not list them.
-    owner_only: bool = False
+    #: Whether an owner may hand this to one person without promoting them.
+    #:
+    #: Not the same question as "which roles hold it" — a manager holds
+    #: users.countries.manage by role, and it is still not grantable, because
+    #: handing out the keys to routing one at a time is how someone becomes a
+    #: manager by the back door. The user_permissions CHECK lists exactly the
+    #: grantable keys, and a test asserts the two have not drifted.
+    grantable: bool = True
 
 
 CATALOGUE: tuple[Permission, ...] = (
@@ -50,16 +54,16 @@ CATALOGUE: tuple[Permission, ...] = (
     Permission("catalogue.write", "Create and edit programmes"),
     Permission("catalogue.verify", "Clear the verification queue so an entry reaches students"),
     Permission("users.edit", "Edit a roster member"),
-    Permission("users.invite", "Invite a counsellor to the agency", owner_only=True),
-    Permission("users.countries.manage", "Set who owns which country", owner_only=True),
-    Permission("tenant.settings", "Agency details and tenant-wide configuration", owner_only=True),
+    Permission("users.invite", "Invite a counsellor to the agency", grantable=False),
+    Permission("users.countries.manage", "Set who owns which country", grantable=False),
+    Permission("tenant.settings", "Agency details and tenant-wide configuration", grantable=False),
 )
 
 BY_KEY: dict[str, Permission] = {p.key: p for p in CATALOGUE}
 
 #: What an owner may hand to one person without promoting them. Mirrors the
 #: user_permissions CHECK constraint.
-GRANTABLE: frozenset[str] = frozenset(p.key for p in CATALOGUE if not p.owner_only)
+GRANTABLE: frozenset[str] = frozenset(p.key for p in CATALOGUE if p.grantable)
 
 
 COUNSELLOR: frozenset[str] = frozenset({
@@ -75,6 +79,10 @@ MANAGER: frozenset[str] = COUNSELLOR - {"leads.read.owned"} | {
     "catalogue.write",
     "catalogue.verify",
     "users.edit",
+    # Routing ownership is day-to-day team management, not a keys-to-the-
+    # kingdom setting: a manager covering for someone on leave has to be able
+    # to move a country without an owner in the room.
+    "users.countries.manage",
 }
 
 OWNER: frozenset[str] = frozenset(BY_KEY)

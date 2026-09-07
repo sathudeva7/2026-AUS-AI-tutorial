@@ -10,15 +10,18 @@ import logging
 import os
 from typing import Literal
 
+from uuid import UUID
+
 from fastapi import Depends, Query, status as http
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from api import new_router
 from auth import Principal, require_auth, require_permission
 from envelope import ApiError, enveloped
 from permissions import effective_permissions
 from repositories import users as users_repo
-from services import people
+from permissions import has_permission
+from services import geo, people, tenant_profile
 
 import clerk
 
@@ -187,3 +190,141 @@ def invite_user(
         raise ApiError(http.HTTP_409_CONFLICT, "ALREADY_INVITED",
                        "That person has already been invited.")
     return _row(principal.tenant_id, user_id)
+
+
+class CountriesRequest(BaseModel):
+    """The COMPLETE set of countries this person owns.
+
+    PUT rather than PATCH: the screen is a multi-select, so the client already
+    holds the whole set and sending it is simpler than composing add/remove
+    operations for a list of at most a few dozen.
+    """
+
+    countries: list[str] = Field(max_length=300)
+
+    @field_validator("countries")
+    @classmethod
+    def _valid(cls, v: list[str]) -> list[str]:
+        # Deduped rather than refused: a multi-select can emit the same value
+        # twice, which is not a mistake worth a 422 — and `unique (user_id,
+        # country)` would refuse the insert anyway.
+        #
+        # An EMPTY entry is different, and is refused. normalise_country
+        # returns None for one, because it also serves optional address
+        # fields where blank legitimately means "not given". In a list of
+        # countries there is no such reading: "" is junk, and quietly dropping
+        # it would save a set the caller never asked for.
+        codes = set()
+        for raw in v:
+            code = geo.normalise_country(raw)
+            if code is None:
+                raise ValueError("Choose a country from the list.")
+            codes.add(code)
+        return sorted(codes)
+
+
+@router.put("/api/users/{user_id}/countries")
+def set_user_countries(
+    user_id: UUID,
+    req: CountriesRequest,
+    principal: Principal = Depends(require_permission("users.countries.manage")),
+):
+    """Set who owns routing for which countries.
+
+    Owner and manager. Owning a country decides which leads you SEE, so a
+    counsellor able to set this could grant themselves visibility — and the
+    key is absent from the user_permissions CHECK, so it cannot be handed to
+    them individually either.
+
+    `user_id` comes from the URL and is therefore the caller's to choose, so
+    it is resolved against `principal.tenant_id`. A user in another agency is
+    404, not 403: a 403 confirms the id exists, which answers the question the
+    prober was asking.
+
+    Existing leads keep their counsellor. Ownership drives NEW routing only —
+    moving live leads because someone's countries changed would take work out
+    from under them mid-conversation.
+    """
+    if users_repo.get(principal.tenant_id, str(user_id)) is None:
+        raise ApiError(http.HTTP_404_NOT_FOUND, "USER_NOT_FOUND",
+                       "That person is not on your team.")
+    users_repo.set_countries(principal.tenant_id, str(user_id), req.countries)
+    return _row(principal.tenant_id, str(user_id))
+
+
+class UserPatch(BaseModel):
+    """Editable roster details.
+
+    `extra="forbid"` rather than Pydantic's default of dropping unknown keys.
+    Silently ignoring {"role": "owner"} answers 200 and lets the caller
+    believe it worked; for a privilege field that silence is the dangerous
+    option. Role belongs to Clerk, email is identity, and deactivation has
+    its own endpoint.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, max_length=200)
+    work_phone: str | None = None
+    timezone: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _blank_is_null(cls, v: str | None) -> str | None:
+        """A cleared form field arrives as "" and means "no value"."""
+        return v.strip() or None if v is not None else None
+
+    @field_validator("work_phone")
+    @classmethod
+    def _valid_phone(cls, v: str | None) -> str | None:
+        # None and "" both clear it: the column is nullable, and a counsellor
+        # who no longer wants to be rung should be able to remove it.
+        return tenant_profile.normalise_phone(v) if v else None
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_zone(cls, v: str | None) -> str | None:
+        # NOT nullable here, unlike the two above: users.timezone is NOT NULL
+        # and defaults to UTC, so there is no such thing as a user with no
+        # zone. A null is a mistake rather than a clear, and saying so beats
+        # a constraint violation surfacing as a 500.
+        if v is None:
+            raise ValueError("A timezone is required.")
+        return tenant_profile.check_timezone(v)
+
+
+@router.patch("/api/users/{user_id}")
+def patch_user(
+    user_id: UUID,
+    patch: UserPatch,
+    principal: Principal = Depends(require_auth),
+):
+    """Edit a roster member.
+
+    Not `Depends(require_permission("users.edit"))`, which every other write
+    endpoint uses, because everyone may edit their OWN row. Timezone is why:
+    availability is wall clock read against users.timezone, so a counsellor
+    who cannot set their own has their hours interpreted in the wrong zone,
+    and the first sign of it is a student offered a 3am call.
+
+    The check still resolves through permissions.py — self-or-permission, not
+    a role comparison.
+    """
+    if str(user_id) != principal.user_id and not has_permission(
+        principal.role, "users.edit", principal.grants
+    ):
+        raise ApiError(
+            http.HTTP_403_FORBIDDEN,
+            "MISSING_PERMISSION",
+            "You do not have permission to do that.",
+            details=[{"field": "permission", "issue": "users.edit"}],
+        )
+
+    if users_repo.get(principal.tenant_id, str(user_id)) is None:
+        raise ApiError(http.HTTP_404_NOT_FOUND, "USER_NOT_FOUND",
+                       "That person is not on your team.")
+
+    fields = patch.model_dump(exclude_unset=True)
+    if fields:
+        users_repo.update(principal.tenant_id, str(user_id), fields)
+    return _row(principal.tenant_id, str(user_id))
