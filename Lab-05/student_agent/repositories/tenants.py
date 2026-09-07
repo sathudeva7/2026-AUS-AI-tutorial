@@ -48,7 +48,7 @@ def update(tenant_id: str, fields: dict[str, Any]) -> None:
         )
 
 
-def ensure_with_owner(
+def ensure_with_member(
     tenant_id: str,
     name: str,
     *,
@@ -57,23 +57,62 @@ def ensure_with_owner(
     user_name: str | None,
     role: str,
 ) -> None:
-    """Create the agency and its first user on first contact.
+    """Make sure the agency exists and this person is an active member of it.
 
-    `on conflict do nothing` rather than checking first: two browser tabs
-    opening together would both find nothing and both insert. One transaction,
-    because a tenant with no owner is not a state worth leaving behind.
+    Runs on first contact, and covers two arrivals that look identical from
+    here:
+
+      * the founder, who created the organization and has no row yet
+      * an invited counsellor, who ALREADY has a row — created by the invite,
+        with a null clerk_user_id and status 'invited'
+
+    The second is why this claims before it inserts. Matching on email is the
+    only join available: the invite knew an address, and the Clerk id does not
+    exist until the person accepts. Inserting instead would collide with
+    `unique (tenant_id, email)` and leave them unable to sign in at all, having
+    accepted an invitation that then went nowhere.
+
+    One transaction, because a tenant row without its first user would make
+    every later request believe provisioning was done, and nothing would retry.
+
+    `on conflict do nothing` rather than checking first: two tabs opened
+    together both find nothing and both insert, and the unique constraints are
+    the only referee that sees every request at once.
     """
     with engine().begin() as conn:
         conn.execute(
-            text("insert into tenants (id, name) values (:id, :name)"
-                 " on conflict (id) do nothing"),
+            text(
+                "insert into tenants (id, name) values (:id, :name)"
+                " on conflict (id) do nothing"
+            ),
             {"id": tenant_id, "name": name},
         )
+
+        # Clerk is authoritative for role, so the claim refreshes it: the
+        # invite recorded what was intended, this records what Clerk granted.
+        claimed = conn.execute(
+            text(
+                "update users"
+                "   set clerk_user_id = :c, status = 'active', accepted_at = now(),"
+                "       role = :r, name = coalesce(name, :n)"
+                " where tenant_id = :t and email = :e and clerk_user_id is null"
+                " returning id"
+            ),
+            {"t": tenant_id, "e": email, "c": clerk_user_id,
+             "n": user_name, "r": role},
+        ).scalar_one_or_none()
+        if claimed is not None:
+            return
+
         conn.execute(
-            text("insert into users (tenant_id, clerk_user_id, email, name,"
-                 " role, status, accepted_at)"
-                 " values (:t, :c, :e, :n, :r, 'active', now())"
-                 " on conflict (tenant_id, clerk_user_id) do nothing"),
+            text(
+                "insert into users"
+                "  (tenant_id, clerk_user_id, email, name, role, status, accepted_at)"
+                " values (:t, :c, :e, :n, :r, 'active', now())"
+                # Keyed on email, not clerk_user_id: the row that could already
+                # be here is one this person's own second tab just claimed.
+                " on conflict (tenant_id, email) do nothing"
+            ),
             {"t": tenant_id, "c": clerk_user_id, "e": email,
              "n": user_name, "r": role},
         )

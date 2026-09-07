@@ -28,18 +28,18 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-import httpx
 import jwt
-from fastapi import Depends, Header, status
+from fastapi import Depends, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 
+import clerk
 from envelope import ApiError
 from repositories import tenants as tenants_repo, users as users_repo
 
 log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
-CLERK_API = "https://api.clerk.com/v1"
 
 def _org_from_claims(claims: dict) -> tuple[str | None, str]:
     """The active organization, across both Clerk session-token formats.
@@ -61,11 +61,6 @@ def _org_from_claims(claims: dict) -> tuple[str | None, str]:
     return org_id, role
 
 
-# Clerk's default organization roles, used ONLY to seed a brand-new row. After
-# that this database is authoritative for what someone may do — mirroring the
-# Clerk role on every request would mean two sources of truth for the same
-# question, and they would eventually disagree.
-_CLERK_ROLE_SEED = {"org:admin": "owner", "admin": "owner"}
 
 
 # ---------------------------------------------------------------------------
@@ -163,25 +158,6 @@ def verify_token(token: str) -> dict:
 # Provisioning
 # ---------------------------------------------------------------------------
 
-def _clerk_get(path: str) -> dict:
-    """One call to Clerk's Backend API, with the secret key.
-
-    Used only when provisioning — a session token carries the user's id but
-    not their email address, and `users.email` is NOT NULL. One call per new
-    user, never on the request path.
-    """
-    secret = os.getenv("CLERK_SECRET_KEY", "").strip()
-    if not secret:
-        raise RuntimeError(f"CLERK_SECRET_KEY is not set. Add it to {ROOT / '.env'}")
-    r = httpx.get(
-        f"{CLERK_API}{path}",
-        headers={"Authorization": f"Bearer {secret}"},
-        timeout=10.0,
-    )
-    r.raise_for_status()
-    return r.json()
-
-
 def _provision(claims: dict) -> None:
     """Create the agency and its first user, once.
 
@@ -198,8 +174,8 @@ def _provision(claims: dict) -> None:
     org_id, org_role = _org_from_claims(claims)
     clerk_user_id = claims["sub"]
 
-    org = _clerk_get(f"/organizations/{org_id}")
-    user = _clerk_get(f"/users/{clerk_user_id}")
+    org = clerk.get(f"/organizations/{org_id}")
+    user = clerk.get(f"/users/{clerk_user_id}")
 
     emails = user.get("email_addresses") or []
     primary = user.get("primary_email_address_id")
@@ -220,9 +196,9 @@ def _provision(claims: dict) -> None:
 
     # Clerk's org role seeds the first row only; this database owns the
     # question from then on.
-    role = _CLERK_ROLE_SEED.get(org_role, "owner")
+    role = clerk.ROLE_FROM_CLERK.get(org_role, clerk.DEFAULT_ROLE)
 
-    tenants_repo.ensure_with_owner(
+    tenants_repo.ensure_with_member(
         org_id,
         org.get("name") or "Untitled agency",
         clerk_user_id=clerk_user_id,
@@ -232,8 +208,20 @@ def _provision(claims: dict) -> None:
     )
 
 
-def _load(org_id: str, clerk_user_id: str) -> Principal | None:
+def _load(org_id: str, clerk_user_id: str, role: str) -> Principal | None:
     """The caller's row plus their grants, or None if not provisioned yet.
+
+    `role` comes from the TOKEN, not from the row. Clerk owns roles — its
+    dialog is where they are changed — so a role read from our column is only
+    ever as fresh as the last time provisioning ran, which is once, ever.
+    That drift is not theoretical: it let a Clerk `org:member` pass our
+    `users.invite` check and get refused by Clerk with a 403 nobody could
+    explain.
+
+    The column stays, as a cache the roster renders and the widget and the
+    worker can read without a token. When it disagrees with the token it is
+    corrected here, so a stale row heals on that person's next request rather
+    than needing a migration.
 
     The SQL is in repositories/users.py; what happens here is the step that
     layer must not take — turning a row into a Principal, which asserts the
@@ -242,11 +230,16 @@ def _load(org_id: str, clerk_user_id: str) -> Principal | None:
     record = users_repo.find_active(org_id, clerk_user_id)
     if record is None:
         return None
+    if record.role != role:
+        log.info(
+            "role changed in clerk: user=%s %s -> %s", clerk_user_id, record.role, role
+        )
+        users_repo.set_role(org_id, record.id, role)
     return Principal(
         clerk_user_id=clerk_user_id,
         tenant_id=org_id,
         user_id=record.id,
-        role=record.role,
+        role=role,
         grants=record.grants,
     )
 
@@ -255,15 +248,37 @@ def _load(org_id: str, clerk_user_id: str) -> Principal | None:
 # FastAPI dependency
 # ---------------------------------------------------------------------------
 
-def require_auth(authorization: str = Header(default="")) -> Principal:
+#: Declares the scheme in OpenAPI, which is what gives /docs its Authorize
+#: button. Reading the header by hand worked, but Swagger then treated it as
+#: an ordinary optional parameter and quietly sent the request WITHOUT it —
+#: every "Try it out" came back 401 with no way to supply a token.
+#:
+#: auto_error=False so a missing header reaches us as None: FastAPI's own 403
+#: would bypass the envelope and say "Not authenticated", where the rest of
+#: the API says MISSING_BEARER_TOKEN.
+bearer_scheme = HTTPBearer(
+    auto_error=False,
+    description=(
+        "A Clerk session token. In the browser console while signed in:\n\n"
+        "    await window.Clerk.session.getToken()\n\n"
+        "Paste the value alone — Swagger adds the 'Bearer ' prefix. These "
+        "expire after about 60 seconds, so fetch a fresh one if you get "
+        "INVALID_TOKEN."
+    ),
+)
+
+
+def require_auth(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> Principal:
     """The verified caller, provisioning the agency on first contact.
 
     Attach with `Depends(require_auth)` rather than repeating the check in
     each endpoint: the endpoint someone adds next year and forgets to protect
     is the hole, so the safe shape has to be the default one.
     """
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
+    token = credentials.credentials if credentials else ""
+    if not token:
         raise ApiError(
             status.HTTP_401_UNAUTHORIZED,
             "MISSING_BEARER_TOKEN",
@@ -294,7 +309,7 @@ def require_auth(authorization: str = Header(default="")) -> Principal:
             headers={"WWW-Authenticate": "Bearer"},
         ) from None
 
-    org_id, _ = _org_from_claims(claims)
+    org_id, org_role = _org_from_claims(claims)
     if not org_id:
         # Claim KEYS only — never their values, which describe a real person.
         # Enough to tell "no organization is active" from "the organization is
@@ -311,10 +326,13 @@ def require_auth(authorization: str = Header(default="")) -> Principal:
             "Signed in, but no agency is selected.",
         )
 
-    principal = _load(org_id, claims["sub"])
+    # Unknown Clerk roles fall to the LEAST privileged of ours, never the most.
+    role = clerk.ROLE_FROM_CLERK.get(org_role, clerk.DEFAULT_ROLE)
+
+    principal = _load(org_id, claims["sub"], role)
     if principal is None:
         _provision(claims)
-        principal = _load(org_id, claims["sub"])
+        principal = _load(org_id, claims["sub"], role)
     if principal is None:
         raise ApiError(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
