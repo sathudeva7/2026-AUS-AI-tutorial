@@ -151,8 +151,7 @@ function TenantCard() {
           className="mt-1 text-[11.5px]"
           style={{ color: "var(--color-neutral-700)" }}
         >
-          <Link to="/login">Sign in</Link> to load your agency. The console is
-          still reachable — the API has no auth yet.
+          <Link to="/login">Sign in</Link> to load your agency.
         </div>
       </Show>
 

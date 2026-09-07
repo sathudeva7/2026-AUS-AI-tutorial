@@ -24,6 +24,18 @@ dependencies = [
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.1",
     "alembic>=1.13",
+
+    # Clerk session tokens. Verified locally against Clerk's published public
+    # keys (JWKS) — no network round-trip to Clerk per request. [crypto]
+    # pulls in the RSA backend RS256 needs.
+    "pyjwt[crypto]>=2.8",
+
+    # Real validation for reference data. An E.164 regex only checks the
+    # SHAPE of a number: '+947424059777' passes it and is not a real Sri
+    # Lankan number. libphonenumber knows how long an LK mobile actually is,
+    # and pycountry is the ISO 3166 register rather than "two letters".
+    "phonenumbers>=8.13",
+    "pycountry>=23.12",
 ]
 
 [project.optional-dependencies]

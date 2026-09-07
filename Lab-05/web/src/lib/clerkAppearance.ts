@@ -32,6 +32,7 @@ const organic = {
   accent600: "#b2622d",
   accent700: "#8c491a",
   accent2_600: "#728157",
+  danger: "#a3231b",
   neutral100: "#f9f4ed",
   neutral200: "#eee7db",
   neutral700: "#645c50",
@@ -54,10 +55,10 @@ export const clerkAppearance: Appearance = {
     colorBorder: organic.divider,
     colorRing: organic.accent,
     colorShadow: organic.shadow,
-    // Organic has no red. Terracotta already carries "attention" across the
-    // console — the escalation banner, the stale-catalogue pill — so errors
-    // read in the same language rather than importing a foreign hue.
-    colorDanger: organic.accent700,
+    // Organic now has exactly one red, and this is it: --color-danger. The
+    // earlier terracotta harmonised so well that a failed sign-in read as
+    // ordinary copy. Warnings stay terracotta; only errors are red.
+    colorDanger: organic.danger,
     colorWarning: organic.accent600,
     colorSuccess: organic.accent2_600,
     colorModalBackdrop: "rgba(46, 43, 37, 0.5)",

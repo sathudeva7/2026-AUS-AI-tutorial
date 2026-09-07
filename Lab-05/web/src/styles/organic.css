@@ -15,6 +15,14 @@
   --color-text: #201e1d;
   --color-accent: #c67139;
   --color-accent-2: #7a8a5e;
+
+  /* Danger. Organic had no red, and errors were being drawn in
+     --color-accent-800 — a brown that sits so close to body text that a
+     validation message read as ordinary prose. This is the one hue in the
+     system that must NOT harmonise: it has to interrupt.
+     5.57:1 on --color-surface, 6.82:1 on --color-neutral-100 (WCAG AA). */
+  --color-danger: #a3231b;
+  --color-danger-100: #fdeceb;
   --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
 
   /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the

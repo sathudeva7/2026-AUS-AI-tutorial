@@ -24,6 +24,10 @@ import logging
 import sys
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
+
+import phonenumbers
+import pycountry
 
 # Lab root on sys.path so `mocks` and `mcp_servers` resolve — they live one
 # level up, shared with the counsellor agent.
@@ -32,14 +36,18 @@ if str(_LAB_ROOT) not in sys.path:
     sys.path.insert(0, str(_LAB_ROOT))
 
 from dotenv import load_dotenv  # noqa: E402
-from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi import Depends, FastAPI, HTTPException  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from pydantic import BaseModel, Field, field_validator  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 from sse_starlette.sse import EventSourceResponse  # noqa: E402
 from strands import Agent  # noqa: E402
 from strands.models.openai import OpenAIModel  # noqa: E402
 
 from agent.core import ROOT, build_agent, prepend_context  # noqa: E402
+from auth import Principal, require_auth, require_permission  # noqa: E402
+from db import engine  # noqa: E402
+from permissions import effective_permissions  # noqa: E402
 from agent.hooks import sanitise_student_text  # noqa: E402
 from agent import facts as facts_module, planner as planner_module, pricing  # noqa: E402
 from agent.planner import format_history, format_tool_specs, plan_for_prompt  # noqa: E402
@@ -386,8 +394,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):51(7[0-9]|8[0-9])",
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type"],
+    # PATCH is needed by /api/tenant. A method missing here is refused by the
+    # browser before the request is sent, which looks like the endpoint is down.
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    # Authorization is required now that console calls carry a Clerk token.
+    # A browser silently drops a header the server does not allow, so an
+    # omission here looks like "the token is being ignored".
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
@@ -402,8 +415,217 @@ def health() -> dict[str, Any]:
     }
 
 
+@app.get("/api/me")
+def me(principal: Principal = Depends(require_auth)) -> dict[str, Any]:
+    """The caller, their agency and everything they may do.
+
+    Also the endpoint that provisions a brand-new agency: the first request
+    after signing up creates the tenant row and the owner. The frontend calls
+    it on load, so provisioning happens before anything needs it.
+    """
+    return {
+        "tenant_id": principal.tenant_id,
+        "user_id": principal.user_id,
+        "role": principal.role,
+        "permissions": sorted(effective_permissions(principal.role, principal.grants)),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Agency details
+# ---------------------------------------------------------------------------
+# Deliberately NOT collected at signup. CreateAgencyRoute asks only for a name
+# — everything else is configuration and belongs in the console, where there is
+# an agency to attach it to and context for what the fields are for.
+
+
+class TenantOut(BaseModel):
+    id: str
+    name: str
+    phone: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    region: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
+    default_timezone: str
+    active: bool
+    #: The phone's country and national part, resolved by libphonenumber
+    #: rather than guessed from the dialling code. Eleven dialling codes are
+    #: shared between countries — +44 covers Guernsey, Jersey, the Isle of Man
+    #: and the UK, and +1 covers twenty-five — so a prefix match cannot tell
+    #: them apart. The library can, and it already parsed this number on the
+    #: way in.
+    phone_country: str | None = None
+    phone_national: str | None = None
+    #: True when phone and a usable address are both present. Drives the
+    #: "finish setting up your agency" prompt rather than leaving the fields
+    #: silently empty forever.
+    complete: bool
+
+
+class TenantPatch(BaseModel):
+    """Editable agency details.
+
+    `name` is absent on purpose. It is a CACHE of Clerk's organization name —
+    Clerk is authoritative, and a form that wrote it here would drift until
+    the next sync silently overwrote whatever was typed. Name changes go
+    through Clerk's own OrganizationProfile.
+
+    Validation happens here as well as in the database. The CHECK constraints
+    are the boundary and stay the boundary; this layer exists so a mistyped
+    phone number comes back as a readable 422 instead of a constraint
+    violation surfacing as a 500.
+    """
+
+    phone: str | None = None
+    address_line1: str | None = Field(default=None, max_length=200)
+    address_line2: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, max_length=100)
+    region: str | None = Field(default=None, max_length=100)
+    postal_code: str | None = Field(default=None, max_length=32)
+    # ISO 3166-1 alpha-2, stored uppercase.
+    country: str | None = None
+    default_timezone: str | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def _valid_phone(cls, v: str | None) -> str | None:
+        """A real number, not merely a plausible-looking one.
+
+        The regex this replaces accepted '+947424059777' — one digit too long
+        for Sri Lanka — and '+9400000000'. libphonenumber knows each country's
+        actual numbering plan. The value is normalised to E.164 on the way in,
+        so '+94 74 240 5977' and '+94742405977' store identically.
+        """
+        if v is None or not v.strip():
+            return None
+        try:
+            parsed = phonenumbers.parse(v.strip(), None)
+        except phonenumbers.NumberParseException:
+            raise ValueError(
+                "Enter the number in international format, starting with + and "
+                "the country code — for example +94771234567."
+            ) from None
+        if not phonenumbers.is_valid_number(parsed):
+            raise ValueError(
+                "That is not a valid number for its country code. Check the digits."
+            )
+        return phonenumbers.format_number(
+            parsed, phonenumbers.PhoneNumberFormat.E164
+        )
+
+    @field_validator("country")
+    @classmethod
+    def _valid_country(cls, v: str | None) -> str | None:
+        """Checked against the ISO 3166 register, not against "two letters".
+
+        'XX' matches the old pattern and is not a country. The frontend sends
+        a code from a dropdown, so a failure here means either a bad client or
+        someone calling the API directly — both of which should be refused.
+        """
+        if v is None or not v.strip():
+            return None
+        code = v.strip().upper()
+        if len(code) != 2 or pycountry.countries.get(alpha_2=code) is None:
+            raise ValueError("Choose a country from the list.")
+        return code
+
+    @field_validator("default_timezone")
+    @classmethod
+    def _known_zone(cls, v: str | None) -> str | None:
+        """An unknown zone would render every time wrong rather than fail."""
+        if v is None:
+            return None
+        try:
+            ZoneInfo(v)
+        except Exception:  # noqa: BLE001
+            raise ValueError(
+                "Not a known timezone. Use an IANA name such as Asia/Colombo."
+            ) from None
+        return v
+
+    @field_validator(
+        "address_line1", "address_line2", "city", "region", "postal_code",
+        mode="before",
+    )
+    @classmethod
+    def _blank_is_null(cls, v: object) -> object:
+        """A cleared form field arrives as "" and means "no value"."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+
+_TENANT_COLUMNS = (
+    "id, name, phone, address_line1, address_line2, city, region,"
+    " postal_code, country, default_timezone, active"
+)
+
+
+def _tenant_row(tenant_id: str) -> TenantOut:
+    with engine().connect() as conn:
+        row = conn.execute(
+            text(f"select {_TENANT_COLUMNS} from tenants where id = :id"),
+            {"id": tenant_id},
+        ).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="tenant_not_found")
+    data = dict(row._mapping)
+    data["phone_country"] = None
+    data["phone_national"] = None
+    if data["phone"]:
+        try:
+            parsed = phonenumbers.parse(data["phone"], None)
+            data["phone_country"] = phonenumbers.region_code_for_number(parsed)
+            data["phone_national"] = phonenumbers.national_significant_number(parsed)
+        except phonenumbers.NumberParseException:
+            # Stored before this parsed cleanly. Leave both null and let the
+            # form show the raw E.164 rather than dropping the number.
+            pass
+    data["complete"] = bool(
+        data["phone"] and data["address_line1"] and data["city"] and data["country"]
+    )
+    return TenantOut(**data)
+
+
+@app.get("/api/tenant")
+def get_tenant(principal: Principal = Depends(require_auth)) -> TenantOut:
+    """The agency record. Any member may read it — the rail and the widget
+    preview both show the name and city."""
+    return _tenant_row(principal.tenant_id)
+
+
+@app.patch("/api/tenant")
+def patch_tenant(
+    patch: TenantPatch,
+    principal: Principal = Depends(require_permission("tenant.settings")),
+) -> TenantOut:
+    """Update agency details. Owner-only, per the permission catalogue.
+
+    Only fields actually sent are touched, so a form that renders half the
+    record cannot blank the other half by omission.
+    """
+    fields = patch.model_dump(exclude_unset=True)
+    if "country" in fields and fields["country"]:
+        fields["country"] = fields["country"].upper()
+    if not fields:
+        return _tenant_row(principal.tenant_id)
+
+    assignments = ", ".join(f"{k} = :{k}" for k in fields)
+    with engine().begin() as conn:
+        conn.execute(
+            text(f"update tenants set {assignments} where id = :tenant_id"),
+            {**fields, "tenant_id": principal.tenant_id},
+        )
+    return _tenant_row(principal.tenant_id)
+
+
 @app.get("/api/leads")
-def list_leads() -> dict[str, Any]:
+def list_leads(
+    principal: Principal = Depends(require_permission("leads.read.owned")),
+) -> dict[str, Any]:
     """The lead book, for the UI's lead picker. Includes what is known and
     what is still missing per lead — the missing list is what makes the
     "ask, never infer" behaviour visible before you even send a message."""
@@ -502,7 +724,10 @@ def tools_catalog(
 
 
 @app.get("/api/notes")
-def get_notes(lead_id: str) -> dict[str, Any]:
+def get_notes(
+    lead_id: str,
+    principal: Principal = Depends(require_permission("leads.read.owned")),
+) -> dict[str, Any]:
     """A lead's episodic notes. Unconditional so the UI can distinguish
     "empty" from "missing"."""
     content = CLIENT.load_note(lead_id)
@@ -510,7 +735,10 @@ def get_notes(lead_id: str) -> dict[str, Any]:
 
 
 @app.get("/api/briefing")
-def get_briefing(lead_id: str) -> dict[str, Any]:
+def get_briefing(
+    lead_id: str,
+    principal: Principal = Depends(require_permission("leads.read.owned")),
+) -> dict[str, Any]:
     """Facts, escalations and pending follow-ups for one lead — the same
     digest the counsellor agent's `get_lead_briefing` tool returns. Handy
     for watching the agent's writes land while you demo."""

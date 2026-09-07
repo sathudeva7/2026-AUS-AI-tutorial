@@ -14,6 +14,75 @@ import type { Briefing, Lead } from "./types";
 export const AGENT_BASE_URL =
   import.meta.env.VITE_AGENT_URL ?? "http://localhost:8001";
 
+/** Thrown on 401/403 so a surface can send the viewer somewhere useful
+ *  rather than rendering "500" at them. */
+export class NotAuthenticatedError extends Error {
+  constructor(
+    readonly status: number,
+    readonly reason: string,
+  ) {
+    super(
+      status === 403 && reason === "no_active_organization"
+        ? "Signed in, but no agency is selected."
+        : "Not signed in, or the session has expired.",
+    );
+    this.name = "NotAuthenticatedError";
+  }
+}
+
+/** How this module gets a Clerk token.
+ *
+ * `live.ts` is a plain module, so it cannot call `useAuth()`. A component
+ * registers Clerk's own `getToken` at startup instead — see AuthBridge in
+ * App.tsx. Reaching into `window.Clerk` would work today and break on any
+ * internal change; this does not.
+ *
+ * Default returns null so the student widget, which runs on an agency's site
+ * with no Clerk session at all, keeps working. Its endpoints are public.
+ */
+type TokenProvider = () => Promise<string | null>;
+
+let tokenProvider: TokenProvider = async () => null;
+
+export function setTokenProvider(provider: TokenProvider): void {
+  tokenProvider = provider;
+}
+
+/** `Authorization` when there is a session, nothing when there is not. */
+async function authHeaders(): Promise<Record<string, string>> {
+  let token: string | null = null;
+  try {
+    token = await tokenProvider();
+  } catch {
+    // Clerk still loading, or signed out. Send the request unauthenticated
+    // and let the backend decide — it is the only side that may decide.
+  }
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Turn an auth refusal into a typed error; leave everything else alone. */
+async function raiseForStatus(response: Response, label: string): Promise<void> {
+  if (response.ok) return;
+  if (response.status === 401 || response.status === 403) {
+    let reason = "";
+    try {
+      reason = ((await response.json()) as { detail?: string }).detail ?? "";
+    } catch {
+      // no JSON body; the status is enough
+    }
+    throw new NotAuthenticatedError(response.status, reason);
+  }
+  throw new Error(`${label} returned ${response.status}`);
+}
+
+/** A 422 from the API, split per field so the form can annotate its inputs. */
+export class FieldValidationError extends Error {
+  constructor(readonly fields: Record<string, string>) {
+    super(Object.values(fields)[0] ?? "Some details need fixing.");
+    this.name = "FieldValidationError";
+  }
+}
+
 export class AgentUnreachableError extends Error {
   constructor(cause: unknown) {
     super(
@@ -28,14 +97,97 @@ export class AgentUnreachableError extends Error {
 async function get<T>(path: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${AGENT_BASE_URL}${path}`);
+    response = await fetch(`${AGENT_BASE_URL}${path}`, {
+      headers: await authHeaders(),
+    });
   } catch (cause) {
     throw new AgentUnreachableError(cause);
   }
-  if (!response.ok) {
-    throw new Error(`GET ${path} returned ${response.status}`);
-  }
+  await raiseForStatus(response, `GET ${path}`);
   return (await response.json()) as T;
+}
+
+/** `GET /api/me` — the caller, their agency, and everything they may do.
+ *
+ * Also what provisions a brand-new agency: Clerk creates the organization in
+ * the browser, so this is the first time the backend hears of it. Call it
+ * before anything that needs a tenant to exist. */
+export async function fetchMe(): Promise<{
+  tenant_id: string;
+  user_id: string;
+  role: string;
+  permissions: string[];
+}> {
+  return get("/api/me");
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  phone: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+  default_timezone: string;
+  active: boolean;
+  /** Resolved by libphonenumber on the server, not guessed from the dialling
+   *  code: +44 is shared by Guernsey, Jersey, the Isle of Man and the UK, and
+   *  +1 by twenty-five countries, so a prefix match picks the wrong one. */
+  phone_country: string | null;
+  phone_national: string | null;
+  /** Phone plus a usable address. Drives the "finish setting up" prompt. */
+  complete: boolean;
+}
+
+/** `GET /api/tenant` — the agency record. Any member may read it. */
+export async function fetchTenant(): Promise<Tenant> {
+  return get("/api/tenant");
+}
+
+/** `PATCH /api/tenant` — owner-only; the backend enforces that, not the UI.
+ *
+ * Only the fields passed are written, so a partial form cannot blank the rest
+ * by omission. `name` is deliberately not accepted: it is a cache of Clerk's
+ * organization name, and writing it here would drift until the next sync.
+ */
+export async function patchTenant(
+  patch: Partial<
+    Omit<
+      Tenant,
+      "id" | "name" | "active" | "complete" | "phone_country" | "phone_national"
+    >
+  >,
+): Promise<Tenant> {
+  let response: Response;
+  try {
+    response = await fetch(`${AGENT_BASE_URL}/api/tenant`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify(patch),
+    });
+  } catch (cause) {
+    throw new AgentUnreachableError(cause);
+  }
+  if (response.status === 422) {
+    // Every failing field, keyed by name, so each message can be shown under
+    // the input it concerns. Returning only the first would make a form with
+    // two mistakes take two round-trips to fix.
+    const body = (await response.json()) as {
+      detail?: { loc?: (string | number)[]; msg?: string }[];
+    };
+    const fields: Record<string, string> = {};
+    for (const item of body.detail ?? []) {
+      const field = item.loc?.slice(1).join(".") ?? "_";
+      // Pydantic prefixes custom validator messages with "Value error, ".
+      fields[field] = (item.msg ?? "Invalid value").replace(/^Value error, /, "");
+    }
+    throw new FieldValidationError(fields);
+  }
+  await raiseForStatus(response, "PATCH /api/tenant");
+  return (await response.json()) as Tenant;
 }
 
 /** `GET /api/leads` — the lead book. `missing` is what nobody has asked yet. */
@@ -70,7 +222,7 @@ export async function createLead(input: {
   try {
     response = await fetch(`${AGENT_BASE_URL}/api/leads`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(input),
     });
   } catch (cause) {
@@ -135,7 +287,7 @@ export async function runAgent(args: {
   try {
     response = await fetch(`${AGENT_BASE_URL}/api/run`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify({ prompt: args.prompt, lead_id: args.leadId }),
       signal: args.signal,
     });

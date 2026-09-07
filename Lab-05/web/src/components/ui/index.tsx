@@ -166,6 +166,7 @@ export function Field({
   label,
   hint,
   hintTone,
+  error,
   htmlFor,
   children,
   className,
@@ -173,28 +174,64 @@ export function Field({
   label: string;
   hint?: string;
   hintTone?: "muted" | "warning";
+  /** A validation message for THIS field. Takes the hint's place while set,
+   *  so the guidance and the complaint never stack up under one input, and is
+   *  announced (role="alert") rather than only coloured. */
+  error?: string;
   htmlFor?: string;
   children: ReactNode;
   className?: string;
 }) {
+  const message = error ?? hint;
+  const tone = error ? "warning" : hintTone;
   return (
     <div className={cn("field", className)}>
       <label htmlFor={htmlFor}>{label}</label>
       {children}
-      {hint ? (
+      {message ? (
         <div
-          className="mt-1 text-[11.5px]"
+          className={cn(
+            "mt-1 text-[11.5px]",
+            error && "flex items-start gap-1.5 font-semibold",
+          )}
+          role={error ? "alert" : undefined}
+          id={error && htmlFor ? `${htmlFor}-error` : undefined}
           style={{
-            color:
-              hintTone === "warning"
+            color: error
+              ? "var(--color-danger)"
+              : tone === "warning"
                 ? "var(--color-accent-800)"
                 : "var(--color-neutral-700)",
           }}
         >
-          {hint}
+          {/* Colour alone is not a signal — it is invisible to anyone who
+              cannot distinguish it. The mark and the weight carry the meaning
+              too, so the message still reads as a failure in greyscale. */}
+          {error ? <AlertMark /> : null}
+          <span>{message}</span>
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AlertMark() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      className="mt-px flex-none"
+    >
+      <circle cx="8" cy="8" r="7" fill="currentColor" />
+      <path
+        d="M8 4.4v4.2M8 11.2v.6"
+        stroke="var(--color-neutral-100)"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
@@ -384,3 +421,6 @@ export function Table({
     </table>
   );
 }
+
+export { Select } from "./Select";
+export type { SelectOption } from "./Select";

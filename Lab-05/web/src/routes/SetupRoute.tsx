@@ -15,6 +15,7 @@ import { ChatPanel } from "@/components/widget/ChatPanel";
 import { embedSnippet, WIDGET_ACCENTS } from "@/data/fixtures/tenant";
 import { repo } from "@/data/repo";
 import type { TenantConfig } from "@/data/types";
+import { AgencyDetailsCard } from "@/components/setup/AgencyDetailsCard";
 
 export function SetupRoute() {
   const [tenant, setTenant] = useState<TenantConfig | null>(null);
@@ -66,6 +67,7 @@ export function SetupRoute() {
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)_340px] gap-[22px]">
         <div className="flex flex-col gap-4">
+          <AgencyDetailsCard />
           <Card className="rounded-md p-[18px]">
             <CardTitle className="mb-3">API key</CardTitle>
             <dl className="m-0 flex flex-col gap-2.5 text-[13px]">
