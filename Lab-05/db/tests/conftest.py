@@ -60,11 +60,14 @@ def cur(engine):
 
 @pytest.fixture
 def seed(cur):
-    """Two tenants, a role in each, and one active user in tenant A.
+    """Two tenants and one active user in tenant A.
 
     The second tenant exists so the cross-tenant tests have somewhere to point
     that is real but wrong — a reference that fails because the row does not
     exist would prove nothing about tenant isolation.
+
+    Roles are an enum on `users` since migration 002, so there is nothing to
+    create for them.
     """
 
     def _seed():
@@ -72,23 +75,11 @@ def seed(cur):
         cur.execute("insert into tenants (id, name) values ('org_B', 'Agency B')")
 
         cur.execute(
-            "insert into roles (tenant_id, name) values ('org_A', 'counsellor')"
-            " returning id"
-        )
-        role_a = cur.fetchone()[0]
-        cur.execute(
-            "insert into roles (tenant_id, name) values ('org_B', 'counsellor')"
-            " returning id"
-        )
-        role_b = cur.fetchone()[0]
-
-        cur.execute(
-            "insert into users (tenant_id, clerk_user_id, email, role_id, status)"
-            " values ('org_A', 'user_clerk_a', 'priya@agency-a.test', %s, 'active')"
-            " returning id",
-            (role_a,),
+            "insert into users (tenant_id, clerk_user_id, email, role, status)"
+            " values ('org_A', 'user_clerk_a', 'priya@agency-a.test',"
+            " 'counsellor', 'active') returning id"
         )
         user_a = cur.fetchone()[0]
-        return {"role_a": role_a, "role_b": role_b, "user_a": user_a}
+        return {"user_a": user_a}
 
     return _seed

@@ -38,7 +38,9 @@ tests/          scenario tests (see AGENTS.md)
 
 ## Core entities
 
-`Tenant`, `User`, `Role`, `Permission`, `Programme`, `Lead`, `Message`, `ToolCall`, `Followup`. Field lists are in `AGENTS.md`; the people-and-access tables are drawn in `db/SCHEMA.md`.
+`Tenant`, `User`, `Programme`, `Lead`, `Message`, `ToolCall`, `Followup`. Field lists are in `AGENTS.md`; the people-and-access tables are drawn in `db/SCHEMA.md`.
+
+Roles and permissions are not entities. A role is an enum on `User`; the permission catalogue is a code constant in `student_agent/permissions.py`.
 
 There is no `Counsellor` entity. A counsellor is a `User` holding the counsellor role — an admin who never takes a lead is the same table with a different role.
 
@@ -61,7 +63,7 @@ These are product guarantees, not preferences. Do not soften them for convenienc
 - **Escalation is rule-driven.** Triggers: prior visa refusal, fee/payment dispute, dependants or third-party sponsorship, shortlist confidence below the floor, student asks for a person. Triggers fire on the topic appearing, not on confirmation. No visa or immigration advice, ever.
 - **Routing is explicit.** Assign by `user_countries`. No owner for the country means the lead joins the unassigned queue. Never round-robin silently to fill a gap. Several users may own one country, so the choice between them is a stated rule — fewest active leads, ties broken by lowest user id — and it is recorded, never improvised.
 - **Everything is reconstructable.** Every agent decision must be replayable from `ToolCall` + `Message` alone. If a code path makes a decision without writing a row, that path is wrong.
-- **Access is a role plus grants.** Effective permissions are the role's set union the user's own grants. Grants only ever add — there is no revoke, because a plain union is what keeps "why can this person do that?" answerable in one query. Permission keys come from a closed catalogue; owner-only keys are never individually grantable.
+- **Access is a role plus grants.** `User.role` is one of `counsellor | manager | owner`; on top of it a user may hold individual grants. Effective permissions are the role's set union those grants, resolved in ONE place — `student_agent/permissions.py`. Grants only ever add: there is no revoke, because a plain union is what keeps "why can this person do that?" answerable in one query. Owner-only keys are never individually grantable, and the `user_permissions` CHECK is the same rule stated at the database boundary.
 - **The unassigned queue is visible to everyone.** A counsellor sees their owned countries plus every unassigned lead, including countries nobody owns. An escalated lead that no one can see is the failure escalation exists to prevent.
 - **Tenant scoping.** Every query filters on `tenant_id`. No cross-tenant read is ever correct. `tenant_id` is the Clerk `org_id`, and it comes from the verified session token — never from a request body, query string or header the client controls. A tenant id the caller can set is not a scope, it is a suggestion.
 - **Membership, not domain, defines the agency.** Access comes from Clerk organization membership. Do not gate on email domain: small agencies run on Gmail, agencies with branches run on several domains, and anyone able to guess an address on the domain would be inside. Invitations are minted per address and only the recipient can accept.
