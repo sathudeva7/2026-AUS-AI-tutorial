@@ -166,3 +166,50 @@ test("a person's own timezone is shown, not the viewer's", async ({ page }) => {
 
   await expect(page.getByText("Europe/London")).toBeVisible();
 });
+
+test("a link straight to one person opens them", async ({ page }) => {
+  // The roster used to reach this by redirecting to /counsellors/{first id} in
+  // an effect on load, and nothing tested it — so replacing the redirect with
+  // a plain fallback could have broken deep links silently.
+  const people = [
+    user({ name: "Priya Fernando" }),
+    user({ name: "Anita Silva", email: "anita@agency.test" }),
+  ];
+  await mockRoster(page, people);
+
+  await page.goto(`/counsellors/${people[1].id}`);
+
+  await expect(page.getByRole("heading", { name: "Anita Silva" })).toBeVisible();
+});
+
+test("opening the roster shows the first person, and the URL stays clean", async ({
+  page,
+}) => {
+  await mockRoster(page, [
+    user({ name: "Priya Fernando" }),
+    user({ name: "Anita Silva" }),
+  ]);
+
+  await page.goto("/counsellors");
+
+  await expect(page.getByRole("heading", { name: "Priya Fernando" })).toBeVisible();
+  // No redirect: the old effect rewrote history on load, which put an id in
+  // the bar nobody had chosen and made Back behave oddly.
+  await expect(page).toHaveURL(/\/counsellors$/);
+});
+
+test("choosing someone puts them in the URL, so a refresh keeps them", async ({
+  page,
+}) => {
+  await mockRoster(page, [
+    user({ name: "Priya Fernando" }),
+    user({ name: "Anita Silva" }),
+  ]);
+
+  await page.goto("/counsellors");
+  await page.getByRole("button", { name: /Anita Silva/ }).click();
+
+  await expect(page).toHaveURL(/\/counsellors\/[0-9a-f-]+$/);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Anita Silva" })).toBeVisible();
+});

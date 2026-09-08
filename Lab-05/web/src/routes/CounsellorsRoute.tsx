@@ -9,16 +9,16 @@
  * the richer parts of the detail panel are still to come; what is rendered
  * here is real.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { RosterList } from "@/features/users/components/RosterList";
 import { UserDetail } from "@/features/users/components/UserDetail";
 import { useUsers } from "@/features/users/queries";
+import { useProgrammes } from "@/features/catalogue/queries";
 import { toCountryCode } from "@/features/users/display";
 import { COUNTRY_BY_CODE } from "@/data/countries";
 import { InviteDialog } from "@/components/counsellors/InviteDialog";
-import { repo } from "@/data/repo";
 
 export function CounsellorsRoute() {
   const { counsellorId } = useParams();
@@ -29,35 +29,34 @@ export function CounsellorsRoute() {
   // a second request.
   const { data } = useUsers();
   const users = data?.users;
+  const { data: programmes } = useProgrammes();
 
-  const selected = useMemo(
-    () => users?.find((u) => u.id === counsellorId),
-    [users, counsellorId],
-  );
-
-  // Open on the first person so the panel is not empty on arrival.
-  useEffect(() => {
-    if (!counsellorId && users?.length) {
-      navigate(`/counsellors/${users[0].id}`, { replace: true });
-    }
-  }, [counsellorId, users, navigate]);
+  // Falls back to the first person so the panel is not empty on arrival.
+  //
+  // Previously an effect that navigated to /counsellors/{first id}. That is a
+  // render, then an effect, then a history entry, then another render — to
+  // reach a screen indistinguishable from this one. Deep links still work:
+  // an id in the URL is found here first.
+  const selected = users?.find((u) => u.id === counsellorId) ?? users?.[0];
 
   // Destinations the catalogue covers that nobody ACTIVE owns. This is the
   // unassigned queue in advance, and it belongs at the top of the roster.
   // Invited people do not count: they cannot be routed to until they accept.
-  const [uncovered, setUncovered] = useState<string[]>([]);
-  useEffect(() => {
-    if (!users) return;
-    void repo.listProgrammes().then((programmes) => {
-      const owned = new Set(
-        users.filter((u) => u.status === "active").flatMap((u) => u.countries),
-      );
-      // The catalogue names countries; users own codes. Normalise before
-      // comparing, or nothing ever matches and everything reads as a gap.
-      const catalogued = new Set(programmes.map((p) => toCountryCode(p.country)));
-      setUncovered([...catalogued].filter((c) => !owned.has(c)).sort());
-    });
-  }, [users]);
+  //
+  // Worked out during render rather than stored. It was state filled by an
+  // effect, which cost an extra render and — because the catalogue read is
+  // async with nothing cancelling it — could settle out of order and leave the
+  // banner describing a roster that had already changed.
+  const owned = new Set(
+    (users ?? []).filter((u) => u.status === "active").flatMap((u) => u.countries),
+  );
+  // The catalogue names countries; users own codes. Normalise before
+  // comparing, or nothing ever matches and everything reads as a gap.
+  const uncovered = [
+    ...new Set((programmes ?? []).map((p) => toCountryCode(p.country))),
+  ]
+    .filter((code) => !owned.has(code))
+    .sort();
 
   return (
     <div className="console flex h-screen">
