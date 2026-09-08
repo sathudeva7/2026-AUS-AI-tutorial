@@ -1,7 +1,15 @@
 import { useEffect } from "react";
 import { useAuth } from "@clerk/react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
-import { setTokenProvider } from "@/data/live";
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+} from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { setTokenProvider } from "@/api/client";
+import { queryClient } from "@/api/queryClient";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { SessionProvider } from "@/data/SessionProvider";
 import { AppShell } from "@/components/shell/AppShell";
@@ -21,7 +29,7 @@ import { CreateAgencyRoute } from "@/routes/CreateAgencyRoute";
  *  that is fine for a click-through and wrong for an operator tool. */
 /** Hands Clerk's `getToken` to the API client.
  *
- * `data/live.ts` is a plain module and cannot call a hook, so the token has
+ * `api/client.ts` is a plain module and cannot call a hook, so the token has
  * to arrive from inside the tree. Rendered once, above the routes, so it is
  * registered before any surface fetches.
  *
@@ -39,21 +47,22 @@ function AuthBridge() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthBridge />
-      <Routes>
-        {/* Outside the shell: no rail, because no agency is known yet.
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthBridge />
+        <Routes>
+          {/* Outside the shell: no rail, because no agency is known yet.
             Splat paths are required — Clerk routes its own sub-steps
             (verification code, OAuth return, SSO callback) under these
             prefixes, and without the `/*` a refresh mid-flow 404s. */}
-        <Route path="/login/*" element={<LoginRoute />} />
-        <Route path="/signup/*" element={<SignupRoute />} />
-        <Route path="/create-agency/*" element={<CreateAgencyRoute />} />
+          <Route path="/login/*" element={<LoginRoute />} />
+          <Route path="/signup/*" element={<SignupRoute />} />
+          <Route path="/create-agency/*" element={<CreateAgencyRoute />} />
 
-        <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/widget" replace />} />
+          <Route element={<AppShell />}>
+            <Route index element={<Navigate to="/widget" replace />} />
 
-          {/* Public, and it must stay that way. The widget is the student
+            {/* Public, and it must stay that way. The widget is the student
               surface — it renders on the agency's own website, where the
               visitor is a prospective student and never a Clerk user.
               Wrapping the whole shell in RequireAuth would lock students out
@@ -61,40 +70,41 @@ export default function App() {
               /api/leads) are correspondingly public; they get their own
               boundary later, keyed on the tenant's widget key rather than on
               a user session. */}
-          <Route path="/widget" element={<WidgetRoute />} />
+            <Route path="/widget" element={<WidgetRoute />} />
 
-          {/* Everything below is the counsellor console. The real boundary is
+            {/* Everything below is the counsellor console. The real boundary is
               require_auth in student_agent/auth.py; this only decides what a
               browser is shown on the way there. */}
-          <Route
-            element={
-              <RequireAuth>
-                <SessionProvider>
-                  <Outlet />
-                </SessionProvider>
-              </RequireAuth>
-            }
-          >
-            <Route path="/leads" element={<DashboardRoute />} />
-            <Route path="/leads/:leadId" element={<DashboardRoute />} />
-            <Route path="/assistant" element={<AssistantRoute />} />
-            <Route path="/counsellors" element={<CounsellorsRoute />} />
             <Route
-              path="/counsellors/:counsellorId"
-              element={<CounsellorsRoute />}
-            />
-            <Route path="/catalogue" element={<CatalogueRoute />} />
-            <Route path="/catalogue/new" element={<ProgrammeEditorRoute />} />
-            <Route
-              path="/catalogue/:programmeId"
-              element={<ProgrammeEditorRoute />}
-            />
-            <Route path="/setup" element={<SetupRoute />} />
-          </Route>
+              element={
+                <RequireAuth>
+                  <SessionProvider>
+                    <Outlet />
+                  </SessionProvider>
+                </RequireAuth>
+              }
+            >
+              <Route path="/leads" element={<DashboardRoute />} />
+              <Route path="/leads/:leadId" element={<DashboardRoute />} />
+              <Route path="/assistant" element={<AssistantRoute />} />
+              <Route path="/counsellors" element={<CounsellorsRoute />} />
+              <Route
+                path="/counsellors/:counsellorId"
+                element={<CounsellorsRoute />}
+              />
+              <Route path="/catalogue" element={<CatalogueRoute />} />
+              <Route path="/catalogue/new" element={<ProgrammeEditorRoute />} />
+              <Route
+                path="/catalogue/:programmeId"
+                element={<ProgrammeEditorRoute />}
+              />
+              <Route path="/setup" element={<SetupRoute />} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/widget" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+            <Route path="*" element={<Navigate to="/widget" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

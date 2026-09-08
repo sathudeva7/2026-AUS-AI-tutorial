@@ -1,166 +1,27 @@
-/** HTTP against the student agent on :8001.
+/** Endpoints that have no feature folder yet.
  *
- * Only the endpoints that exist. `student_agent/main.py` also serves
- * /api/notes, /api/tools, /api/reset and /api/end_session; those are lab
- * instruments, not product, and the console does not call them.
+ * The transport moved to `@/api/client` and the error types to `@/api/errors`.
+ * What is left here is leads, tenant and the agent turn — each moves into its
+ * own `features/<name>/api.ts` the day it is next worked on. Users has already
+ * gone; see `features/users/api.ts`.
  *
- * Failures throw. CLAUDE.md: "Prefer failing loudly over degrading
- * gracefully." Nothing in this file returns an empty list to paper over a
- * dead backend — the surfaces render an explicit failure card instead.
+ * The re-exports below keep existing importers working. They are a migration
+ * aid, not an interface: new code imports from `@/api/*` directly.
  */
 import { readSse } from "@/lib/sse";
+import { AGENT_BASE_URL } from "@/api/config";
+import { authHeaders, get, patch } from "@/api/client";
+import { AgentUnreachableError } from "@/api/errors";
 import type { Briefing, Lead } from "./types";
 
-export const AGENT_BASE_URL =
-  import.meta.env.VITE_AGENT_URL ?? "http://localhost:8001";
-
-/** Thrown on 401/403 so a surface can send the viewer somewhere useful
- *  rather than rendering "500" at them. */
-/** The API's one response shape.
- *
- *   success  { success: true,  data, message?, meta?, request_id }
- *   failure  { success: false, error: { code, message, details? }, request_id }
- *
- * `code` is a stable constant to switch on; `message` is for people. Before
- * this, 401 returned `detail` as a string and 422 returned it as an array,
- * so every caller had to guess which it had this time. */
-interface ApiError {
-  code: string;
-  message: string;
-  details?: { field: string; issue: string }[];
-}
-
-interface Envelope<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  meta?: Record<string, unknown>;
-  error?: ApiError;
-  request_id?: string;
-}
-
-export class NotAuthenticatedError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-    /** Quote this when reporting a failure — the same id is in the server log. */
-    readonly requestId?: string,
-  ) {
-    super(message);
-    this.name = "NotAuthenticatedError";
-  }
-}
-
-/** How this module gets a Clerk token.
- *
- * `live.ts` is a plain module, so it cannot call `useAuth()`. A component
- * registers Clerk's own `getToken` at startup instead — see AuthBridge in
- * App.tsx. Reaching into `window.Clerk` would work today and break on any
- * internal change; this does not.
- *
- * Default returns null so the student widget, which runs on an agency's site
- * with no Clerk session at all, keeps working. Its endpoints are public.
- */
-type TokenProvider = () => Promise<string | null>;
-
-let tokenProvider: TokenProvider = async () => null;
-
-export function setTokenProvider(provider: TokenProvider): void {
-  tokenProvider = provider;
-}
-
-/** `Authorization` when there is a session, nothing when there is not. */
-async function authHeaders(): Promise<Record<string, string>> {
-  let token: string | null = null;
-  try {
-    token = await tokenProvider();
-  } catch {
-    // Clerk still loading, or signed out. Send the request unauthenticated
-    // and let the backend decide — it is the only side that may decide.
-  }
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-/** A validation failure, split per field so the form can annotate its inputs. */
-export class FieldValidationError extends Error {
-  constructor(
-    readonly fields: Record<string, string>,
-    message?: string,
-    readonly requestId?: string,
-  ) {
-    super(message ?? Object.values(fields)[0] ?? "Some details need fixing.");
-    this.name = "FieldValidationError";
-  }
-}
-
-/** Anything else the API refused. */
-export class ApiRequestError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-    readonly requestId?: string,
-  ) {
-    super(message);
-    this.name = "ApiRequestError";
-  }
-}
-
-/** Unwrap an envelope, or throw the typed error it describes.
- *
- * One place, so no caller parses an error body again. Before the envelope,
- * 401 returned `detail` as a string and 422 returned it as an array, and each
- * call site had to guess which it had. */
-async function unwrap<T>(response: Response, label: string): Promise<T> {
-  let body: Envelope<T> | null = null;
-  try {
-    body = (await response.json()) as Envelope<T>;
-  } catch {
-    // A non-JSON body — a proxy error page, say. The status still tells us
-    // something, so fall through rather than masking it.
-  }
-
-  if (response.ok && body?.success) return body.data as T;
-
-  const err = body?.error;
-  const rid = body?.request_id;
-  const code = err?.code ?? "ERROR";
-  const message = err?.message ?? `${label} failed (${response.status}).`;
-
-  if (err?.details?.length) {
-    const fields: Record<string, string> = {};
-    for (const d of err.details) fields[d.field] = d.issue;
-    throw new FieldValidationError(fields, message, rid);
-  }
-  if (response.status === 401 || response.status === 403) {
-    throw new NotAuthenticatedError(response.status, code, message, rid);
-  }
-  throw new ApiRequestError(response.status, code, message, rid);
-}
-
-export class AgentUnreachableError extends Error {
-  constructor(cause: unknown) {
-    super(
-      `Cannot reach the Northbound agent at ${AGENT_BASE_URL}. ` +
-        `Start it with: cd Lab-05/student_agent && uvicorn main:app --port 8001`,
-    );
-    this.name = "AgentUnreachableError";
-    this.cause = cause;
-  }
-}
-
-async function get<T>(path: string): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${AGENT_BASE_URL}${path}`, {
-      headers: await authHeaders(),
-    });
-  } catch (cause) {
-    throw new AgentUnreachableError(cause);
-  }
-  return unwrap<T>(response, `GET ${path}`);
-}
+export { AGENT_BASE_URL } from "@/api/config";
+export { setTokenProvider } from "@/api/client";
+export {
+  AgentUnreachableError,
+  ApiRequestError,
+  FieldValidationError,
+  NotAuthenticatedError,
+} from "@/api/errors";
 
 /** `GET /api/me` — the caller, their agency, and everything they may do.
  *
@@ -209,24 +70,14 @@ export async function fetchTenant(): Promise<Tenant> {
  * organization name, and writing it here would drift until the next sync.
  */
 export async function patchTenant(
-  patch: Partial<
+  patchBody: Partial<
     Omit<
       Tenant,
       "id" | "name" | "active" | "complete" | "phone_country" | "phone_national"
     >
   >,
 ): Promise<Tenant> {
-  let response: Response;
-  try {
-    response = await fetch(`${AGENT_BASE_URL}/api/tenant`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-      body: JSON.stringify(patch),
-    });
-  } catch (cause) {
-    throw new AgentUnreachableError(cause);
-  }
-  return unwrap<Tenant>(response, "PATCH /api/tenant");
+  return patch<Tenant>("/api/tenant", patchBody);
 }
 
 /** `GET /api/leads` — the lead book. `missing` is what nobody has asked yet. */
