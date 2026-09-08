@@ -122,10 +122,12 @@ def bound_engine(conn, monkeypatch):
         def begin(self):
             return _SharedBegin(conn)
 
+    import repositories.availability
     import repositories.tenants
     import repositories.users
 
-    for module in (repositories.tenants, repositories.users):
+    for module in (repositories.availability, repositories.tenants,
+                   repositories.users):
         monkeypatch.setattr(module, "engine", lambda: _Bound())
     return _Bound()
 

@@ -97,7 +97,7 @@ erDiagram
         uuid user_id FK
         smallint day_of_week "0=Sunday .. 6=Saturday"
         time start_time "wall clock in users.timezone"
-        time end_time
+        time end_time "> start_time; a night shift is two rows"
     }
 ```
 
@@ -172,6 +172,22 @@ filtered by ownership.
 - **The agency creator is seeded as owner**, before any UI to grant it exists.
 - **Effective permissions resolve in one place** — `permissions.py`. Two
   implementations would disagree eventually.
+- **Availability windows do not overlap.** `availability_rules` carries no
+  exclusion constraint, so the database will happily store a counsellor as
+  available twice at once; the guard lives in `PUT /api/users/{id}/availability`
+  and nowhere else. Two windows that TOUCH are fine — a morning ending at 12:00
+  beside an afternoon starting at 12:00 is an ordinary split shift — so the
+  comparison is `<`, not `<=`. Making this a real constraint means a migration
+  enabling `btree_gist` and an `EXCLUDE` on
+  `(tenant_id, user_id, day_of_week, timerange(start_time, end_time))`; worth
+  doing the day anything other than this endpoint writes the table.
+- **A shift cannot cross midnight in one row.** `end_time > start_time` is
+  CHECKed, so 22:00-02:00 is stored as 22:00-24:00 plus 00:00-02:00. The API
+  refuses the single-row form rather than splitting it silently, so the week a
+  client draws is the week we hold. Postgres `time` includes 24:00:00, which is
+  what makes the first half expressible; Python's `datetime.time` stops at
+  23:59:59, so every read goes through `to_char` and times cross the driver as
+  text.
 
 ## Deliberately absent
 

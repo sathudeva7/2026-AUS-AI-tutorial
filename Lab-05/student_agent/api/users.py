@@ -8,19 +8,21 @@ from typing import Any
 
 import logging
 import os
+import re
 from typing import Literal
 
 from uuid import UUID
 
 from fastapi import Depends, Query, status as http
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_core.core_schema import ValidationInfo
 
 from api import new_router
 from auth import Principal, require_auth, require_permission
 from envelope import ApiError, enveloped
-from permissions import effective_permissions
+from repositories import availability as availability_repo
 from repositories import users as users_repo
-from permissions import has_permission
+from permissions import effective_permissions, has_permission
 from services import geo, people, tenant_profile
 
 import clerk
@@ -328,3 +330,147 @@ def patch_user(
     if fields:
         users_repo.update(principal.tenant_id, str(user_id), fields)
     return _row(principal.tenant_id, str(user_id))
+
+
+# ---------------------------------------------------------------------------
+# Availability
+# ---------------------------------------------------------------------------
+
+#: 00:00 through 24:00. Postgres `time` includes 24:00:00 and that is the only
+#: way to write "until midnight" under the end_time > start_time CHECK.
+_TIME = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$")
+
+
+def _minutes(hhmm: str) -> int:
+    h, m = hhmm.split(":")
+    return int(h) * 60 + int(m)
+
+
+class Rule(BaseModel):
+    """One recurring window, in the counsellor's own wall clock."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: 0=Sunday .. 6=Saturday, matching the CHECK on the table and JS
+    #: getDay(). The UI renders Monday first, which is a different thing from
+    #: the number stored, and conflating the two is the classic bug here.
+    day_of_week: int = Field(ge=0, le=6)
+    start_time: str
+    end_time: str
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def _looks_like_a_time(cls, v: str) -> str:
+        if not _TIME.match(v):
+            raise ValueError("Use 24-hour HH:MM, for example 09:00.")
+        return v
+
+    @field_validator("end_time")
+    @classmethod
+    def _after_the_start(cls, v: str, info: ValidationInfo) -> str:
+        """Validated on end_time rather than on the model, so the error names
+        the field the user can actually fix."""
+        start = info.data.get("start_time")
+        if start is None:
+            return v          # start_time already failed; one complaint is enough
+        if _minutes(v) == _minutes(start):
+            raise ValueError("A shift cannot be zero length.")
+        if _minutes(v) < _minutes(start):
+            # Refused rather than silently split into 22:00-24:00 and
+            # 00:00-02:00. The client would then be drawing a week we do not
+            # hold, and the next GET would disagree with the screen.
+            raise ValueError(
+                "A shift cannot cross midnight. Send it as two rules:"
+                " 22:00-24:00 and 00:00-02:00."
+            )
+        return v
+
+
+class AvailabilityRequest(BaseModel):
+    """The COMPLETE week, like the countries endpoint and for the same reason:
+    the screen is a grid, so the client already holds every rule."""
+
+    rules: list[Rule] = Field(default_factory=list, max_length=100)
+
+    @field_validator("rules")
+    @classmethod
+    def _no_overlaps(cls, v: list[Rule]) -> list[Rule]:
+        """Refuse a counsellor who is available twice at once.
+
+        This guard exists ONLY here: `availability_rules` carries no exclusion
+        constraint, so the database will store the contradiction happily and
+        the damage surfaces much later as a double booking whose cause is no
+        longer visible.
+
+        Touching windows are not overlapping. A morning ending at 12:00 beside
+        an afternoon starting at 12:00 is an ordinary split shift, and a check
+        written with <= instead of < refuses it.
+        """
+        ordered = sorted(v, key=lambda r: (r.day_of_week, _minutes(r.start_time)))
+        for before, after in zip(ordered, ordered[1:]):
+            if (before.day_of_week == after.day_of_week
+                    and _minutes(after.start_time) < _minutes(before.end_time)):
+                raise ValueError(
+                    f"Two windows overlap on day {before.day_of_week}:"
+                    f" {before.start_time}-{before.end_time} and"
+                    f" {after.start_time}-{after.end_time}."
+                )
+        return v
+
+
+def _require_member(tenant_id: str, user_id: UUID) -> None:
+    """404 for anyone outside this agency.
+
+    Not 403, and not an empty week: "no hours set" and "none of your business"
+    are different answers, and the second must not be readable as the first.
+    """
+    if users_repo.get(tenant_id, str(user_id)) is None:
+        raise ApiError(http.HTTP_404_NOT_FOUND, "USER_NOT_FOUND",
+                       "That person is not on your team.")
+
+
+@router.get("/api/users/{user_id}/availability")
+def get_user_availability(
+    user_id: UUID,
+    principal: Principal = Depends(require_auth),
+):
+    """Any member may read a colleague's week.
+
+    Not gated the way writing is. Routing is by owned country, so knowing when
+    the person who owns Australia is actually at their desk is what makes
+    handing a lead over possible at all.
+    """
+    _require_member(principal.tenant_id, user_id)
+    return enveloped(availability_repo.list_for_user(principal.tenant_id, str(user_id)))
+
+
+@router.put("/api/users/{user_id}/availability")
+def set_user_availability(
+    user_id: UUID,
+    req: AvailabilityRequest,
+    principal: Principal = Depends(require_auth),
+):
+    """Set a counsellor's recurring hours.
+
+    Self-or-`users.edit`, the same rule as PATCH /api/users/{id} and for a
+    sharper version of the same reason: these times are read against the
+    person's own timezone, so someone who cannot enter their own hours is
+    offered to students at hours they never agreed to.
+    """
+    if str(user_id) != principal.user_id and not has_permission(
+        principal.role, "users.edit", principal.grants
+    ):
+        raise ApiError(
+            http.HTTP_403_FORBIDDEN,
+            "MISSING_PERMISSION",
+            "You do not have permission to do that.",
+            details=[{"field": "permission", "issue": "users.edit"}],
+        )
+
+    _require_member(principal.tenant_id, user_id)
+    availability_repo.set_for_user(
+        principal.tenant_id,
+        str(user_id),
+        [(r.day_of_week, r.start_time, r.end_time) for r in req.rules],
+    )
+    return enveloped(availability_repo.list_for_user(principal.tenant_id, str(user_id)))

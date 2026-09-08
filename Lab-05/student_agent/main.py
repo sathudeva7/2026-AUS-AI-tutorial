@@ -397,9 +397,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):51(7[0-9]|8[0-9])",
     allow_credentials=False,
-    # PATCH is needed by /api/tenant. A method missing here is refused by the
-    # browser before the request is sent, which looks like the endpoint is down.
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    # PATCH is needed by /api/tenant, PUT by the countries and availability
+    # endpoints. A method missing here is refused by the browser before the
+    # request is sent, which looks like the endpoint is down — and curl,
+    # which sends no preflight, will not reproduce it.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
     # Authorization is required now that console calls carry a Clerk token.
     # A browser silently drops a header the server does not allow, so an
     # omission here looks like "the token is being ignored".
