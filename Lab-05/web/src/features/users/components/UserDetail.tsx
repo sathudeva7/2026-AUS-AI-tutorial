@@ -9,6 +9,7 @@
  */
 import { COUNTRY_BY_CODE } from "@/data/countries";
 
+import { AvailabilityGrid } from "./AvailabilityGrid";
 import { ContactCard } from "./ContactCard";
 import { ROLE_LABEL, STATUS_LABEL, displayName } from "../display";
 import type { User } from "../types";
@@ -62,6 +63,8 @@ export function UserDetail({ user }: { user: User }) {
           )}
         </div>
       </section>
+
+      <AvailabilityGrid user={user} />
     </div>
   );
 }

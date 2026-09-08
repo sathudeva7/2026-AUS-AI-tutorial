@@ -426,3 +426,138 @@
   width: 116px;
   flex: none;
 }
+
+/* ------------------------------------------------------------------ *
+ * Availability grid
+ *
+ * A week template on dated columns. The dates orient; the pattern underneath
+ * repeats, which the note above the grid says in words because no amount of
+ * visual design makes "this is every Tuesday" legible on its own.
+ * ------------------------------------------------------------------ */
+
+.console-week-note {
+  margin: 0;
+  font-size: var(--t-meta);
+  font-weight: 500;
+  color: var(--c-warn);
+}
+
+.console-grid-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+}
+
+.console-grid {
+  display: grid;
+  /* A time gutter, then one column per day. */
+  grid-template-columns: 56px repeat(7, minmax(64px, 1fr));
+  min-width: 520px;
+  user-select: none;
+}
+
+.console-grid-corner {
+  background: var(--c-card);
+  border-bottom: 1px solid var(--c-line-strong);
+}
+
+.console-grid-day {
+  padding: 8px 6px;
+  text-align: center;
+  background: var(--c-card);
+  border-bottom: 1px solid var(--c-line-strong);
+  border-left: 1px solid var(--c-line);
+  font-size: var(--t-meta);
+}
+
+.console-grid-day-name {
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+/* The date is deliberately quieter than the weekday. The weekday is what the
+   pattern is keyed on; the number is only there to help you find your place. */
+.console-grid-day-date {
+  color: var(--c-ink-faint);
+}
+
+.console-grid-time {
+  padding: 0 8px;
+  height: 18px;
+  font-size: 11.5px;
+  line-height: 18px;
+  text-align: right;
+  color: var(--c-ink-faint);
+  background: var(--c-card);
+}
+
+.console-cell {
+  height: 18px;
+  border: 0;
+  border-left: 1px solid var(--c-line);
+  border-top: 1px solid #f1f2ef;
+  background: var(--c-card);
+  padding: 0;
+  cursor: pointer;
+}
+
+/* A heavier rule on the hour, so the eye can count without labels on every
+   half-hour row. */
+.console-cell[data-hour="true"],
+.console-grid-time[data-hour="true"] {
+  border-top: 1px solid var(--c-line);
+}
+
+.console-cell:hover:not(:disabled) {
+  background: var(--c-accent-soft);
+}
+
+.console-cell[data-on="true"] {
+  background: var(--c-accent);
+  border-top-color: color-mix(in srgb, #fff 22%, var(--c-accent));
+}
+
+.console-cell[data-on="true"]:hover:not(:disabled) {
+  background: var(--c-accent-hover);
+}
+
+.console-cell:disabled {
+  cursor: default;
+}
+
+.console-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+.console-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.console-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.console-swatch[data-kind="available"] {
+  background: var(--c-accent);
+}
+
+/* Booked meetings have no table yet. The swatch is drawn hollow so the legend
+   states the plan without the grid implying data that does not exist. */
+.console-swatch[data-kind="booked"] {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--c-line-strong) 0 2px,
+    transparent 2px 4px
+  );
+  border: 1px solid var(--c-line-strong);
+}
