@@ -1,6 +1,6 @@
 # Northbound — data model (1: people and access)
 
-> Part 1 — people and access (below) · [Part 2 — leads and facts](#northbound--data-model-2-leads-and-facts)
+> Part 1 — people and access (below) · [Part 2 — leads and facts](#northbound--data-model-2-leads-and-facts) · [Part 3 — meetings](#northbound--data-model-3-meetings)
 
 Who works at an agency, what they may do, and when they are reachable. The
 lead record is part 2; catalogue and audit tables come later.
@@ -229,8 +229,11 @@ and nothing more.
 # Northbound — data model (2: leads and facts)
 
 The student, what we have been told about them, and the documents that back it
-up. Conversation, notes, escalations, follow-ups and slots come in `004`;
-programmes and requirements are their own slice.
+up. Of what this section originally promised for `004`, only booked
+consultations have landed — as [`meetings`](#northbound--data-model-3-meetings),
+not `slots`, for the reason given there. Conversation, notes, escalations and
+follow-ups are still to come, each as its own migration; programmes and
+requirements are their own slice.
 
 Migration `003` creates `leads`, `lead_facts`, `lead_documents` and
 `tenant_fact_requirements`.
@@ -641,3 +644,168 @@ here is the evidence*. A placeholder has no source, no quote and no timestamp,
 so allowing one means making every provenance column nullable — dropping the
 guarantee in order to store rows that carry no information. "Not yet asked" is
 the absence of a row, which is what absence honestly means.
+
+---
+
+# Northbound — data model (3: meetings)
+
+> [Part 1 — people and access](#northbound--data-model-1-people-and-access) · [Part 2 — leads and facts](#northbound--data-model-2-leads-and-facts) · Part 3 — meetings (below)
+
+A booked consultation between one student and one counsellor. Migration `004`
+creates `meetings` and enables `btree_gist`.
+
+## There are no empty slots
+
+The table holds **only meetings that were actually booked**. Free time is
+derived — `availability_rules` minus the rows here — and never stored.
+
+The alternative was to explode each counsellor's weekly pattern into concrete
+bookable rows for the weeks ahead, then mark them taken. That design writes
+thousands of rows whose content is "nothing is happening", and it turns every
+edit of a weekly pattern into a reconciliation problem: which generated rows
+get deleted, and what happens to the ones already booked inside a window the
+counsellor has just removed? Deriving free time asks that question once, at
+read time, where the answer cannot go stale.
+
+Pre-generation earns its keep when a slot needs data of its own — a price, a
+capacity, a duration that varies by type. None of that exists here, so the
+table is named `meetings` rather than `slots`. `003`'s header promised "slots";
+the name is the design, and a table called `slots` invites the discarded one
+back in six months.
+
+```mermaid
+erDiagram
+    leads ||--o{ meetings : "attends"
+    users ||--o{ meetings : "hosts"
+
+    meetings {
+        uuid id PK
+        text tenant_id FK
+        uuid lead_id FK "cascade"
+        uuid user_id FK "restrict"
+        timestamptz starts_at "absolute, not wall clock"
+        timestamptz ends_at
+        text description "what it is about AND how to join"
+        text status "booked | cancelled | completed | no_show"
+        uuid created_by "null = the student booked it"
+        uuid cancelled_by
+        text cancelled_reason
+        timestamptz cancelled_at
+    }
+```
+
+## Absolute time here, wall clock there
+
+`availability_rules` stores a `day_of_week` and a bare `time`, read against
+`users.timezone`. `meetings` stores `timestamptz`. That is not an
+inconsistency — the two describe different kinds of thing.
+
+A weekly pattern is one person's routine. "Monday 9am" has no date, belongs to
+whoever set it, and means 9am *where they are*.
+
+A meeting is a single instant that two people in two countries must both arrive
+at. It has no timezone of its own; each side renders it in their own clock, as
+`CLAUDE.md` requires. A bare "10:30" agreed between Colombo and London is a
+missed call, which is exactly the failure this column type prevents.
+
+## Enforced by the database, not by discipline
+
+**A counsellor cannot be double-booked.** An `EXCLUDE USING gist` constraint on
+`(user_id =, tstzrange(starts_at, ends_at, '[)') &&)`.
+
+This is the reason the table exists in this shape. Two students clicking "book
+10:30" in the same second is not an exotic race; it is the normal case for a
+popular counsellor. An application that `SELECT`s for a clash and then
+`INSERT`s loses that race every time, because both transactions read before
+either writes. Stated as a constraint, overlap is not unlikely — it is
+unrepresentable.
+
+Three details in it carry weight:
+
+- **`[)` is half-open**, so 10:00–10:30 and 10:30–11:00 do not overlap.
+  Back-to-back meetings are the point of a calendar. This is the same call the
+  availability API made when it compared windows with `<` rather than `<=`.
+- **`WHERE status <> 'cancelled'`**, so a cancellation returns the time to the
+  pool. Without it every cancelled meeting would poison its slot permanently,
+  surfacing much later as "why can nobody book Tuesday at ten". `completed` and
+  `no_show` still block: both describe time the counsellor actually gave up.
+- **`user_id` without `tenant_id`.** `users.id` is a primary key and therefore
+  already unique across tenants; adding it would widen the index to restate
+  something the database guarantees.
+
+**A meeting cannot end before it starts, or last no time at all.**
+`CHECK (ends_at > starts_at)`.
+
+**The cancellation timestamp and the status cannot disagree.**
+`CHECK ((status = 'cancelled') = (cancelled_at is not null))` — the same
+pairing `lead_facts` uses for its `closed_*` trio. It catches the easy half
+(cancelled with no time) and the easily forgotten half (reinstating a meeting
+without clearing the time).
+
+**A meeting cannot cross tenants.** The composite foreign keys on
+`(tenant_id, lead_id)` and `(tenant_id, user_id)`, as everywhere else.
+
+## Rules no constraint can express
+
+**A meeting need not fall inside an availability window.** Deliberately not
+enforced. A counsellor takes an urgent call at 8pm, and hours get edited after
+a booking already exists; enforcing it here would make both a database error
+instead of a normal Tuesday. The booking path checks it and may be overridden,
+and the grid draws such a meeting outside the painted region, where it reads
+as what it is.
+
+**Rescheduling is cancel-plus-book, never an in-place edit.** The original row
+stays intact, the freed time returns through the `WHERE` above, and no new
+columns are needed. Editing `starts_at` in place would silently destroy the
+record of when the meeting used to be.
+
+**Deactivating a counsellor must deal with their future meetings.**
+`users.deactivate` reassigns open leads; it knows nothing about this table. A
+counsellor switched off while students hold bookings against them is a real
+hole, and closing it is application logic — cancel, reassign, or refuse — not
+a constraint.
+
+## Deliberately absent
+
+**No exclusion constraint on `lead_id`.** The symmetric rule looks tidy and
+would be wrong: a joint consultation — a counsellor and a visa specialist on
+one call — is two rows at the same time for one student. The counsellor's
+calendar is the scarce resource; the student's is not ours to police.
+
+**No structured location.** How to join is agency-specific — an office address,
+a Meet link, a phone number — and a column would have to guess that list right
+on the first attempt. It lives in `description`, in the counsellor's own words,
+alongside what the meeting is about.
+
+The cost, stated so it is not discovered later: a link inside prose cannot be
+validated, cannot become a Join button, and cannot be checked for presence
+before the confirmation email is sent. Splitting it out later is an additive
+migration; guessing wrong now would be a destructive one.
+
+**No `notified_at` or email delivery columns**, even though a confirmation to
+both parties is why this table was asked for. Nothing sends that email yet, and
+a column no code writes is indistinguishable from a bug — it reads as "we track
+this" while being permanently null. It arrives with the sender.
+
+**No `messages`, `notes`, `escalations` or `followups`.** `003`'s header
+promised all of them here. Each is its own slice with its own decisions, and
+one migration creating five tables is one migration nobody can revert. So
+`lead_facts.message_id` still carries no foreign key, and its comment in `003`
+still points at a `messages` table that has not landed.
+
+## The erasure order has changed
+
+Part 2 closes by noting that deleting an agency is an **ordered purge, not a
+cascade**, because `RESTRICT` deliberately guards provenance. `meetings` adds
+three `RESTRICT` edges to `users` — `user_id`, `created_by` and `cancelled_by`
+— so it now joins that sequence, before `users`:
+
+    lead_facts → lead_documents → meetings → leads → users → tenant
+
+`created_by` is `RESTRICT` rather than `SET NULL` for the reason
+`lead_documents.uploaded_by` already established: null in that column *means*
+"the student booked this themselves", so nulling it would not lose information
+— it would state something false.
+
+Skipping this table makes `delete from tenants` fail. That is the intended loud
+failure, but only for someone who knows to look here.
