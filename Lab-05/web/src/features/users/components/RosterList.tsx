@@ -12,10 +12,18 @@ import { StatusChip } from "@/components/ui";
 import { EmptyNote, FailureCard } from "@/components/ui/States";
 
 import { useUsers } from "../queries";
-import { coverageLine, displayInitials, displayName, STATUS_LABEL } from "../display";
+import {
+  coverageLine,
+  displayInitials,
+  displayName,
+  STATUS_LABEL,
+} from "../display";
 import type { User } from "../types";
 
-const STATUS_STYLE: Record<User["status"], { background: string; foreground: string }> = {
+const STATUS_STYLE: Record<
+  User["status"],
+  { background: string; foreground: string }
+> = {
   active: {
     background: "var(--color-accent-2-200)",
     foreground: "var(--color-accent-2-800)",
@@ -139,7 +147,9 @@ function RosterRow({
           {displayInitials(user)}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13.5px] font-semibold">{name}</span>
+          <span className="block truncate text-[13.5px] font-semibold">
+            {name}
+          </span>
           <span
             className="block truncate text-[11.5px]"
             style={{ color: "var(--color-neutral-700)" }}

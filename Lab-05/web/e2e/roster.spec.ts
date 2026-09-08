@@ -12,7 +12,12 @@
 import { setupClerkTestingToken } from "@clerk/testing/playwright";
 import { expect, test } from "@playwright/test";
 
-import { mockRoster, mockRosterFailure, stubEverythingElse, user } from "./support/roster";
+import {
+  mockRoster,
+  mockRosterFailure,
+  stubEverythingElse,
+  user,
+} from "./support/roster";
 
 test.beforeEach(async ({ page }) => {
   // Per test, not just once in global setup. The saved session cookies are
@@ -32,7 +37,9 @@ test("shows the people the API returns", async ({ page }) => {
 
   await page.goto("/counsellors");
 
-  await expect(page.getByRole("button", { name: /Priya Fernando/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Priya Fernando/ }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: /Anita Silva/ })).toBeVisible();
 });
 
@@ -57,10 +64,14 @@ test("says it is loading before the roster arrives", async ({ page }) => {
   await page.goto("/counsellors");
 
   await expect(page.getByText("Reading the roster…")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Priya Fernando/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Priya Fernando/ }),
+  ).toBeVisible();
 });
 
-test("an empty agency says so, rather than showing an empty list", async ({ page }) => {
+test("an empty agency says so, rather than showing an empty list", async ({
+  page,
+}) => {
   await mockRoster(page, []);
 
   await page.goto("/counsellors");
@@ -80,7 +91,9 @@ test("a broken backend fails loudly", async ({ page }) => {
   await expect(page.getByText(/Something went wrong on our end/)).toBeVisible();
 });
 
-test("an invited person is labelled, and shows their email", async ({ page }) => {
+test("an invited person is labelled, and shows their email", async ({
+  page,
+}) => {
   // They have no name until they accept — the invite knew only an address.
   // Showing a dash would throw away the one identifying thing there is.
   await mockRoster(page, [
@@ -121,12 +134,16 @@ test("selecting someone opens their card", async ({ page }) => {
   await page.goto("/counsellors");
   await page.getByRole("button", { name: /Anita Silva/ }).click();
 
-  await expect(page.getByRole("heading", { name: "Anita Silva" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Anita Silva" }),
+  ).toBeVisible();
   await expect(page.getByText("anita@agency.test")).toBeVisible();
   await expect(page.getByText("+94771234567")).toBeVisible();
 });
 
-test("someone owning no countries is told what that means", async ({ page }) => {
+test("someone owning no countries is told what that means", async ({
+  page,
+}) => {
   // Not an error state to tidy away: it is how the unassigned queue fills.
   await mockRoster(page, [user({ name: "Priya Fernando", countries: [] })]);
 

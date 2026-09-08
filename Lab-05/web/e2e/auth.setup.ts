@@ -50,7 +50,9 @@ setup("sign in", async ({ page }) => {
     );
   }
   if (!process.env.CLERK_SECRET_KEY) {
-    throw new Error("CLERK_SECRET_KEY is missing; it is read from Lab-05/.env.");
+    throw new Error(
+      "CLERK_SECRET_KEY is missing; it is read from Lab-05/.env.",
+    );
   }
 
   // Resolve the id from the address, so .env.test holds something a person can
@@ -87,7 +89,10 @@ setup("sign in", async ({ page }) => {
   await page.goto("/widget");
   await clerk.loaded({ page });
 
-  await clerk.signIn({ page, signInParams: { strategy: "ticket", ticket: token } });
+  await clerk.signIn({
+    page,
+    signInParams: { strategy: "ticket", ticket: token },
+  });
 
   // Prove the session is real before saving it.
   //

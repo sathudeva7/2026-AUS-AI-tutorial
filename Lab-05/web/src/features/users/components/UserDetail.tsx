@@ -9,6 +9,8 @@
  */
 import { Card, Kicker, Tag } from "@/components/ui";
 
+import { ContactCard } from "./ContactCard";
+
 import { ROLE_LABEL, STATUS_LABEL, displayName } from "../display";
 import type { User } from "../types";
 
@@ -28,23 +30,7 @@ export function UserDetail({ user }: { user: User }) {
         </p>
       </header>
 
-      <Card className="rounded-md p-4">
-        <Kicker>Contact</Kicker>
-        <dl className="m-0 mt-3 grid grid-cols-[130px_1fr] gap-y-2 text-[13px]">
-          <dt style={{ color: "var(--color-neutral-700)" }}>Email</dt>
-          <dd className="m-0">{user.email}</dd>
-
-          <dt style={{ color: "var(--color-neutral-700)" }}>Work phone</dt>
-          {/* A product contact, not HR: this is the number a colleague rings
-              about an escalation, which is why every member sees it. */}
-          <dd className="m-0">{user.work_phone ?? "Not given"}</dd>
-
-          <dt style={{ color: "var(--color-neutral-700)" }}>Timezone</dt>
-          {/* Their own zone, not the viewer's. Availability is wall clock read
-              against this, so it is a working fact rather than trivia. */}
-          <dd className="m-0">{user.timezone}</dd>
-        </dl>
-      </Card>
+      <ContactCard user={user} />
 
       <Card className="mt-4 rounded-md p-4">
         <Kicker>Owns routing for</Kicker>

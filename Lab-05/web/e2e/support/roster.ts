@@ -87,6 +87,93 @@ export async function mockRosterFailure(
   });
 }
 
+/** `GET /api/me` — who the viewer is and what they may do.
+ *
+ * Mocked so a test can state the permission it is about. Left to the real
+ * backend, "can this person see the Edit button" would depend on which Clerk
+ * account signed in and what the database says about them today — a test that
+ * passes or fails for reasons nothing to do with the code under test.
+ */
+export async function mockMe(
+  page: Page,
+  me: { user_id?: string; role?: string; permissions?: string[] } = {},
+) {
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: {
+          tenant_id: "tst_A",
+          user_id: me.user_id ?? "00000000-0000-4000-8000-999999999999",
+          role: me.role ?? "owner",
+          permissions: me.permissions ?? [
+            "users.edit",
+            "users.invite",
+            "users.countries.manage",
+            "users.deactivate",
+          ],
+        },
+        request_id: "req_test",
+      }),
+    }),
+  );
+}
+
+/** Serve `PATCH /api/users/{id}` and capture what the form actually sent.
+ *
+ * The body is the point: "only the fields that changed" is the endpoint's
+ * contract and is completely invisible from the screen. A form that helpfully
+ * sends all three fields every time looks identical to a correct one until
+ * two people edit the same person.
+ */
+export async function mockPatchUser(
+  page: Page,
+  respondWith: (body: any) => TestUser,
+) {
+  const sent: any[] = [];
+  await page.route("**/api/users/*", async (route) => {
+    if (route.request().method() !== "PATCH") return route.fallback();
+    const body = route.request().postDataJSON();
+    sent.push(body);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: respondWith(body),
+        request_id: "req_test",
+      }),
+    });
+  });
+  return sent;
+}
+
+/** Refuse a PATCH the way the backend refuses one, naming the field. */
+export async function mockPatchUserFieldError(
+  page: Page,
+  field: string,
+  issue: string,
+) {
+  await page.route("**/api/users/*", async (route) => {
+    if (route.request().method() !== "PATCH") return route.fallback();
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: false,
+        error: {
+          code: "VALIDATION_FAILED",
+          message: "The provided input contains errors.",
+          details: [{ field, issue }],
+        },
+        request_id: "req_test",
+      }),
+    });
+  });
+}
+
 /** The catalogue read the roster page makes to work out which destinations
  *  have no active owner. Fixture-backed in the app today, but stubbing it
  *  keeps these tests about the roster. */
