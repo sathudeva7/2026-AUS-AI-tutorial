@@ -474,3 +474,43 @@ def set_user_availability(
         [(r.day_of_week, r.start_time, r.end_time) for r in req.rules],
     )
     return enveloped(availability_repo.list_for_user(principal.tenant_id, str(user_id)))
+
+
+@router.post("/api/users/{user_id}/deactivate")
+def deactivate_user(
+    user_id: UUID,
+    principal: Principal = Depends(require_permission("users.deactivate")),
+):
+    """Switch off a roster member, and free their open leads.
+
+    A POST of its own rather than a status field on PATCH: this moves leads,
+    checks the agency still has an owner, and revokes an invitation when the
+    row never accepted one. None of that is a field edit.
+
+    Deactivating an already-deactivated person answers 200, not 409. The state
+    they asked for holds, and there is nothing for the caller to do differently.
+    """
+    if str(user_id) == principal.user_id:
+        # Refused even when other owners exist, so this is never the last-owner
+        # rule wearing a different hat. Switching yourself off from inside the
+        # product has no good reason behind it and every sign of a misclick.
+        raise ApiError(
+            422, "CANNOT_DEACTIVATE_SELF",
+            "You cannot deactivate your own account.",
+            details=[{"field": "user_id", "issue": "Ask another owner to do it."}],
+        )
+
+    if users_repo.get(principal.tenant_id, str(user_id)) is None:
+        raise ApiError(http.HTTP_404_NOT_FOUND, "USER_NOT_FOUND",
+                       "That person is not on your team.")
+
+    moved = users_repo.deactivate(principal.tenant_id, str(user_id))
+    if moved is None:
+        raise ApiError(
+            http.HTTP_409_CONFLICT, "LAST_OWNER",
+            "An agency must keep at least one active owner.",
+            details=[{"field": "user_id",
+                      "issue": "Make someone else an owner first."}],
+        )
+    return enveloped(_row(principal.tenant_id, str(user_id)),
+                     meta={"leads_unassigned": moved})

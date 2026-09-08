@@ -56,7 +56,7 @@ def ensure_with_member(
     email: str,
     user_name: str | None,
     role: str,
-) -> None:
+) -> str | None:
     """Make sure the agency exists and this person is an active member of it.
 
     Runs on first contact, and covers two arrivals that look identical from
@@ -96,13 +96,19 @@ def ensure_with_member(
                 "   set clerk_user_id = :c, status = 'active', accepted_at = now(),"
                 "       role = :r, name = coalesce(name, :n)"
                 " where tenant_id = :t and email = :e and clerk_user_id is null"
+                # A REVOKED invitation still has a null clerk_user_id, so
+                # without this it matches here and signing in sets the row
+                # active again - the revocation quietly undone by the very
+                # person it was aimed at. Deactivation is not a state that
+                # accepting an invitation is allowed to leave.
+                "   and status <> 'deactivated'"
                 " returning id"
             ),
             {"t": tenant_id, "e": email, "c": clerk_user_id,
              "n": user_name, "r": role},
         ).scalar_one_or_none()
         if claimed is not None:
-            return
+            return "active"
 
         conn.execute(
             text(
@@ -116,3 +122,12 @@ def ensure_with_member(
             {"t": tenant_id, "c": clerk_user_id, "e": email,
              "n": user_name, "r": role},
         )
+
+        # What the roster actually holds for this address now. The insert above
+        # does nothing when a row already exists, so the caller cannot tell
+        # "provisioned" from "there is a deactivated row here and this person is
+        # not getting in" - and the second, unreported, surfaces as a 500.
+        return conn.execute(
+            text("select status from users where tenant_id = :t and email = :e"),
+            {"t": tenant_id, "e": email},
+        ).scalar_one_or_none()

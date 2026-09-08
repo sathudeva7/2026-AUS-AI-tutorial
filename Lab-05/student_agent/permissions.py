@@ -56,6 +56,12 @@ CATALOGUE: tuple[Permission, ...] = (
     Permission("users.edit", "Edit a roster member"),
     Permission("users.invite", "Invite a counsellor to the agency", grantable=False),
     Permission("users.countries.manage", "Set who owns which country", grantable=False),
+    # Owner-only, mirroring users.invite. A manager able to switch off the
+    # people they cannot hire is a manager able to lock out a rival, and the
+    # asymmetry has no reading that makes sense. Not grantable either: a key
+    # that removes other people's access is a promotion however it arrives.
+    Permission("users.deactivate", "Switch off a roster member's access",
+               grantable=False),
     Permission("tenant.settings", "Agency details and tenant-wide configuration", grantable=False),
 )
 
@@ -100,6 +106,14 @@ def effective_permissions(role: Role, grants: object = ()) -> frozenset[str]:
     `grants` is whatever their user_permissions rows say — an unknown role is
     a programming error rather than a reason to fall back to something
     permissive, so it raises. CLAUDE.md: prefer failing loudly.
+
+    Grants are intersected with GRANTABLE first. The user_permissions CHECK
+    already refuses to store an owner-only key, so a row carrying one should
+    not exist — but "should not exist" is not a guarantee once a hand-run
+    UPDATE, a restored dump or a later migration is in the picture, and the
+    keys this filters are exactly the ones that hand over the agency. The
+    database and this function state the same rule; neither is the only place
+    it is true.
     """
     try:
         base = ROLE_PERMISSIONS[role]
@@ -107,7 +121,7 @@ def effective_permissions(role: Role, grants: object = ()) -> frozenset[str]:
         raise ValueError(
             f"unknown role {role!r}; expected one of {sorted(ROLE_PERMISSIONS)}"
         ) from None
-    return base | frozenset(grants)
+    return base | (frozenset(grants) & GRANTABLE)
 
 
 def has_permission(role: Role, key: str, grants: object = ()) -> bool:

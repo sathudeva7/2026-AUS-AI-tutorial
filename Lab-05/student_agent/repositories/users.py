@@ -9,6 +9,8 @@ out of here is a row; deciding that the row belongs to a proved identity is
 
 from __future__ import annotations
 
+import uuid
+
 from dataclasses import dataclass
 from typing import Any, Sequence
 
@@ -258,3 +260,76 @@ def update(tenant_id: str, user_id: str, fields: dict[str, Any]) -> None:
                  " where tenant_id = :tenant_id and id = :user_id"),
             {**fields, "tenant_id": tenant_id, "user_id": user_id},
         )
+
+
+def status_of_clerk_user(tenant_id: str, clerk_user_id: str) -> str | None:
+    """This Clerk identity's status in this agency, whatever it is.
+
+    `find_active` deliberately filters to active and so cannot tell "switched
+    off" from "never here". Auth needs the difference: one is a 403 the person
+    can act on, the other is a first-time arrival to provision.
+    """
+    with engine().connect() as conn:
+        return conn.execute(
+            text("select status from users"
+                 " where tenant_id = :t and clerk_user_id = :c"),
+            {"t": tenant_id, "c": clerk_user_id},
+        ).scalar_one_or_none()
+
+
+#: Lead statuses that still represent work. 'converted' and 'withdrawn' are
+#: finished: nulling the counsellor on those throws away the answer to "who
+#: closed this?" and there is nothing left to hand on.
+OPEN_LEAD_STATUSES = ("active", "parked")
+
+
+def deactivate(tenant_id: str, user_id: str) -> int | None:
+    """Switch someone off and free their open leads. Returns how many moved,
+    or None if this would leave the agency with no active owner.
+
+    One transaction, opened by locking the tenant's active owners. The guard is
+    otherwise check-then-act: two owners deactivating each other at the same
+    instant both count two owners, both proceed, and the agency is left with
+    none — a state no endpoint can undo, because users.invite and
+    tenant.settings are owner-only. The lock is what makes the second
+    transaction see the first one's work instead of the roster as it was.
+
+    Only ACTIVE owners count as cover. An invited owner has never signed in and
+    an invitation cannot accept itself; a deactivated one is the problem, not
+    the answer.
+    """
+    with engine().begin() as conn:
+        owners = set(conn.execute(
+            text("select id from users"
+                 " where tenant_id = :t and role = 'owner' and status = 'active'"
+                 " for update"),
+            {"t": tenant_id},
+        ).scalars())
+
+        row = conn.execute(
+            text("select role, status from users"
+                 " where tenant_id = :t and id = :u"),
+            {"t": tenant_id, "u": user_id},
+        ).one_or_none()
+        if row is None or row.status == "deactivated":
+            # Already off. The state the caller asked for holds, and saying so
+            # beats making a double-click look like a failure.
+            return 0 if row is not None else None
+
+        if row.role == "owner" and not owners - {uuid.UUID(user_id)}:
+            return None
+
+        conn.execute(
+            text("update users set status = 'deactivated' where tenant_id = :t"
+                 "   and id = :u"),
+            {"t": tenant_id, "u": user_id},
+        )
+        # assigned_at and assignment_reason are left alone. 003 says why: a
+        # stale assigned_at on an unassigned lead reads as history, and it is
+        # the only record of where the lead had been.
+        return conn.execute(
+            text("update leads set assigned_user_id = null"
+                 " where tenant_id = :t and assigned_user_id = :u"
+                 "   and status = any(:open) and deleted_at is null"),
+            {"t": tenant_id, "u": user_id, "open": list(OPEN_LEAD_STATUSES)},
+        ).rowcount

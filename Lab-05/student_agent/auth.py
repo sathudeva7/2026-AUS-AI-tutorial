@@ -158,7 +158,18 @@ def verify_token(token: str) -> dict:
 # Provisioning
 # ---------------------------------------------------------------------------
 
-def _provision(claims: dict) -> None:
+def _deactivated() -> ApiError:
+    """403, not 401: the token is perfectly valid and signing in again will not
+    help. Saying "sign in again" to someone whose account is switched off sends
+    them round a loop that cannot end."""
+    return ApiError(
+        status.HTTP_403_FORBIDDEN,
+        "ACCOUNT_DEACTIVATED",
+        "Your access to this agency has been switched off.",
+    )
+
+
+def _provision(claims: dict) -> str | None:
     """Create the agency and its first user, once.
 
     Two rows, in ONE transaction. A half-provisioned agency is worse than an
@@ -198,7 +209,7 @@ def _provision(claims: dict) -> None:
     # question from then on.
     role = clerk.ROLE_FROM_CLERK.get(org_role, clerk.DEFAULT_ROLE)
 
-    tenants_repo.ensure_with_member(
+    return tenants_repo.ensure_with_member(
         org_id,
         org.get("name") or "Untitled agency",
         clerk_user_id=clerk_user_id,
@@ -331,7 +342,17 @@ def require_auth(
 
     principal = _load(org_id, claims["sub"], role)
     if principal is None:
-        _provision(claims)
+        # Before reaching for Clerk. A deactivated person used to fall straight
+        # through the active-only lookup into provisioning, which could claim
+        # nothing and left the request as a 500 — after two live Clerk calls,
+        # every time they retried. Locked out by accident, expensively, and
+        # reported as our failure rather than a fact about their account.
+        if users_repo.status_of_clerk_user(org_id, claims["sub"]) == "deactivated":
+            raise _deactivated()
+        # A revoked INVITATION has no clerk_user_id to look up, so the check
+        # above cannot see it. ensure_with_member reports what it found.
+        if _provision(claims) == "deactivated":
+            raise _deactivated()
         principal = _load(org_id, claims["sub"], role)
     if principal is None:
         raise ApiError(

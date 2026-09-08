@@ -120,11 +120,12 @@ as capability.
 | `users.edit` | | ✓ | ✓ | ✓ |
 | `users.invite` | | | ✓ | — |
 | `users.countries.manage` | | ✓ | ✓ | — |
+| `users.deactivate` | | | ✓ | — |
 | `tenant.settings` | | | ✓ | — |
 
 The last column is a separate question from the first three. `users.invite`,
-`users.countries.manage` and `tenant.settings` are absent from the
-`user_permissions` CHECK and so cannot be granted individually — handing them
+`users.countries.manage`, `users.deactivate` and `tenant.settings` are absent
+from the `user_permissions` CHECK and so cannot be granted individually — handing them
 out one at a time is how someone is promoted by the back door.
 
 But not grantable does not mean owner-only. A manager holds
@@ -160,7 +161,11 @@ filtered by ownership.
   point at a user in another agency.
 - **Owner-only permissions cannot be granted individually** — the
   `user_permissions` CHECK does not list them.
-- **An invented permission key is refused** by the same CHECK.
+- **An invented permission key is refused** by the same CHECK. `permissions.py`
+  states the same rule a second time, intersecting grants with GRANTABLE before
+  the union: the CHECK means such a row should not exist, and "should not
+  exist" stops being a guarantee the moment a restored dump or a hand-run
+  UPDATE is involved.
 - **`role` is one of three values**, CHECKed rather than free text.
 - **An active user must be linked to Clerk** — `check (status <> 'active' or
   clerk_user_id is not null)`.
@@ -172,6 +177,21 @@ filtered by ownership.
 - **The agency creator is seeded as owner**, before any UI to grant it exists.
 - **Effective permissions resolve in one place** — `permissions.py`. Two
   implementations would disagree eventually.
+- **Routing must skip anyone not active.** Deactivation leaves `user_countries`
+  intact on purpose: `invite()` revives the same row, and releasing the
+  countries would reset `assigned_at` on ownership the person may hold again
+  next week. Nothing reads that table for routing yet. When something does, it
+  filters `users.status = 'active'`, or a lead routes to someone who cannot
+  sign in and never reaches the unassigned queue.
+- **An agency keeps at least one ACTIVE owner.** Enforced in
+  `repositories.users.deactivate`, which locks the tenant's owner rows before
+  counting — check-then-act would let two owners switch each other off at the
+  same instant and leave none. Invited and deactivated owners are not cover: an
+  invitation cannot accept itself, and `users.invite` is owner-only, so an
+  agency in that state cannot be repaired from inside the product. Unreachable
+  over HTTP today, because self-deactivation is refused first and any other
+  target proves a second owner exists; the guard lives in the repository so
+  that demoting an owner inherits it rather than reinventing it.
 - **Availability windows do not overlap.** `availability_rules` carries no
   exclusion constraint, so the database will happily store a counsellor as
   available twice at once; the guard lives in `PUT /api/users/{id}/availability`
