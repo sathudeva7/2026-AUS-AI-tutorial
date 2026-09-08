@@ -12,10 +12,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { Button } from "@/components/ui";
 import { RosterList } from "@/features/users/components/RosterList";
 import { UserDetail } from "@/features/users/components/UserDetail";
 import { useUsers } from "@/features/users/queries";
+import { toCountryCode } from "@/features/users/display";
+import { COUNTRY_BY_CODE } from "@/data/countries";
 import { InviteDialog } from "@/components/counsellors/InviteDialog";
 import { repo } from "@/data/repo";
 
@@ -51,67 +52,75 @@ export function CounsellorsRoute() {
       const owned = new Set(
         users.filter((u) => u.status === "active").flatMap((u) => u.countries),
       );
-      const catalogued = new Set(programmes.map((p) => p.country));
+      // The catalogue names countries; users own codes. Normalise before
+      // comparing, or nothing ever matches and everything reads as a gap.
+      const catalogued = new Set(programmes.map((p) => toCountryCode(p.country)));
       setUncovered([...catalogued].filter((c) => !owned.has(c)).sort());
     });
   }, [users]);
 
   return (
-    <div className="flex h-screen">
-      <div
-        className="flex w-[300px] flex-none flex-col"
-        style={{ borderRight: "1px solid var(--color-divider)" }}
-      >
-        <div className="px-5 pt-[22px]">
-          <h3 className="m-0 text-[21px]">Counsellors</h3>
+    <div className="console flex h-screen">
+      <div className="console-rail flex w-[320px] flex-none flex-col">
+        <div className="px-4 pb-3 pt-5">
+          <h3 className="console-rail-title">Counsellors</h3>
         </div>
 
-        <div className="nb-scroll flex flex-col gap-1.5 overflow-y-auto px-3 pb-4">
+        {/* Coverage gaps belong to the ROSTER, not to whoever happens to be
+            selected. Above the person's name — where this used to sit — an
+            agency-wide warning outranked the record you had just clicked. */}
+        {uncovered.length ? (
+          <div className="px-3 pb-3">
+            <div className="console-gap">
+              <div className="console-gap-title">
+                {uncovered.length === 1
+                  ? "1 country has no owner"
+                  : `${uncovered.length} countries have no owner`}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {uncovered.map((code) => (
+                  <span
+                    key={code}
+                    className="console-country"
+                    data-uncovered="true"
+                    title={COUNTRY_BY_CODE[code]?.name ?? code}
+                  >
+                    {code}
+                  </span>
+                ))}
+              </div>
+              <p className="console-gap-body">
+                Leads for {uncovered.length === 1 ? "it" : "these"} join the
+                unassigned queue. The agent will not route a lead to someone who
+                does not cover the country.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="nb-scroll flex flex-1 flex-col gap-2 overflow-y-auto px-3 pb-4">
           <RosterList
             selectedId={counsellorId}
             onSelect={(userId) => navigate(`/counsellors/${userId}`)}
           />
+        </div>
 
-          <Button
-            variant="secondary"
-            className="mt-1.5"
+        <div className="px-3 pb-4 pt-1">
+          <button
+            type="button"
+            className="console-btn w-full"
+            data-variant="secondary"
             onClick={() => setInviting(true)}
           >
             Invite a counsellor
-          </Button>
+          </button>
         </div>
       </div>
 
-      <div className="nb-scroll flex-1 overflow-y-auto px-8 pb-10 pt-[26px]">
-        {uncovered.length ? (
-          <div
-            className="mb-5 rounded-md p-4"
-            style={{
-              border: "1px solid var(--color-accent-300)",
-              background: "var(--color-accent-100)",
-            }}
-          >
-            <div
-              className="font-heading text-[15px]"
-              style={{ color: "var(--color-accent-800)" }}
-            >
-              {uncovered.join(", ")} {uncovered.length === 1 ? "has" : "have"} no
-              active owner
-            </div>
-            <p
-              className="m-0 mt-1.5 text-[13px] leading-relaxed"
-              style={{ color: "var(--color-accent-800)" }}
-            >
-              The catalogue carries programmes for{" "}
-              {uncovered.length === 1 ? "this destination" : "these destinations"}{" "}
-              but no active counsellor owns{" "}
-              {uncovered.length === 1 ? "it" : "them"}. Those leads join the
-              unassigned queue — the agent will not route them to someone who
-              does not cover the country.
-            </p>
-          </div>
-        ) : null}
-
+      {/* min-w-0: a flex child defaults to min-width:auto and refuses to
+          shrink below its content, so the cards ran off the right edge
+          instead of narrowing. */}
+      <div className="nb-scroll min-w-0 flex-1 overflow-y-auto px-8 pb-12 pt-7">
         {selected ? <UserDetail user={selected} /> : null}
       </div>
 

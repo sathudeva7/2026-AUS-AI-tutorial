@@ -7,7 +7,6 @@
 import { useState } from "react";
 
 import { FieldValidationError } from "@/api/errors";
-import { Button, Card, Field, Input, Kicker } from "@/components/ui";
 import { Select, type SelectOption } from "@/components/ui/Select";
 import { COUNTRIES } from "@/data/countries";
 import { useSession } from "@/data/SessionProvider";
@@ -34,45 +33,52 @@ export function ContactCard({ user }: { user: User }) {
   const mayEdit = can("users.edit") || session?.user_id === user.id;
 
   return (
-    <Card className="rounded-md p-4">
-      <div className="flex items-start justify-between gap-3">
-        <Kicker>Contact</Kicker>
+    <section className="console-card">
+      <div className="console-card-head">
+        <h3 className="console-section-title">Contact</h3>
         {mayEdit && !editing ? (
-          <Button variant="secondary" onClick={() => setEditing(true)}>
+          <button
+            type="button"
+            className="console-btn"
+            data-variant="secondary"
+            onClick={() => setEditing(true)}
+          >
             Edit
-          </Button>
+          </button>
         ) : null}
       </div>
 
-      {editing ? (
-        <ContactForm user={user} onDone={() => setEditing(false)} />
-      ) : (
-        <ContactView user={user} />
-      )}
-    </Card>
+      <div className="console-card-body">
+        {editing ? (
+          <ContactForm user={user} onDone={() => setEditing(false)} />
+        ) : (
+          <ContactView user={user} />
+        )}
+      </div>
+    </section>
   );
 }
 
 function ContactView({ user }: { user: User }) {
   return (
-    <dl className="m-0 mt-3 grid grid-cols-[130px_1fr] gap-y-2 text-[13px]">
-      <dt style={{ color: "var(--color-neutral-700)" }}>Name</dt>
-      <dd className="m-0">{user.name ?? "Not set"}</dd>
+    <dl className="console-dl">
+      <dt>Name</dt>
+      <dd>{user.name ?? "Not set"}</dd>
 
-      <dt style={{ color: "var(--color-neutral-700)" }}>Email</dt>
+      <dt>Email</dt>
       {/* Identity, and not editable here: it is the link to Clerk and the
           address an invitation was accepted on. */}
-      <dd className="m-0">{user.email}</dd>
+      <dd>{user.email}</dd>
 
-      <dt style={{ color: "var(--color-neutral-700)" }}>Work phone</dt>
+      <dt>Work phone</dt>
       {/* A product contact, not HR: the number a colleague rings about an
           escalation, which is why every member can see it. */}
-      <dd className="m-0">{user.work_phone ?? "Not given"}</dd>
+      <dd>{user.work_phone ?? "Not given"}</dd>
 
-      <dt style={{ color: "var(--color-neutral-700)" }}>Timezone</dt>
+      <dt>Timezone</dt>
       {/* Their zone, not the viewer's. Availability is wall clock read against
           this, so it is a working fact rather than trivia. */}
-      <dd className="m-0">{user.timezone}</dd>
+      <dd>{user.timezone}</dd>
     </dl>
   );
 }
@@ -158,25 +164,33 @@ function ContactForm({ user, onDone }: { user: User; onDone: () => void }) {
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-3">
-      <Field label="Name" htmlFor="user-name" error={errors.name}>
-        <Input
+    <div className="flex max-w-[460px] flex-col gap-4">
+      <div>
+        <label className="console-label" htmlFor="user-name">
+          Name
+        </label>
+        <input
           id="user-name"
+          className="console-input"
           value={name}
           disabled={patch.isPending}
           aria-invalid={Boolean(errors.name)}
           onChange={(e) => setName(e.target.value)}
         />
-      </Field>
+        {errors.name ? (
+          <p className="console-error" role="alert">
+            {errors.name}
+          </p>
+        ) : null}
+      </div>
 
-      <Field
-        label="Work phone"
-        htmlFor="user-phone"
-        hint="Colleagues ring this about an escalation. Clear it to remove it."
-        error={errors.work_phone}
-      >
+      <div>
+        <label className="console-label" htmlFor="user-phone">
+          Work phone
+        </label>
         <div className="flex gap-2">
           <Select
+            className="console-dial"
             value={country}
             options={DIAL_OPTIONS}
             onChange={setCountry}
@@ -185,8 +199,9 @@ function ContactForm({ user, onDone }: { user: User; onDone: () => void }) {
             placeholder="Country"
             ariaLabel="Phone country"
           />
-          <Input
+          <input
             id="user-phone"
+            className="console-input"
             value={national}
             disabled={patch.isPending}
             aria-invalid={Boolean(errors.work_phone)}
@@ -196,25 +211,45 @@ function ContactForm({ user, onDone }: { user: User; onDone: () => void }) {
             onChange={(e) => onPhoneChange(e.target.value)}
           />
         </div>
-      </Field>
+        {/* The complaint replaces the guidance rather than stacking under it —
+            two lines of small print below one input is where people stop
+            reading either. */}
+        {errors.work_phone ? (
+          <p className="console-error" role="alert">
+            {errors.work_phone}
+          </p>
+        ) : (
+          <p className="console-hint">
+            Colleagues ring this about an escalation. Clear it to remove it.
+          </p>
+        )}
+      </div>
 
       {errors._ ? (
-        <p
-          role="alert"
-          className="m-0 text-[12.5px]"
-          style={{ color: "var(--color-danger)" }}
-        >
+        <p className="console-error" role="alert">
           {errors._}
         </p>
       ) : null}
 
-      <div className="flex gap-2">
-        <Button onClick={save} disabled={patch.isPending}>
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          className="console-btn"
+          data-variant="primary"
+          onClick={save}
+          disabled={patch.isPending}
+        >
           {patch.isPending ? "Saving…" : "Save"}
-        </Button>
-        <Button variant="secondary" disabled={patch.isPending} onClick={onDone}>
+        </button>
+        <button
+          type="button"
+          className="console-btn"
+          data-variant="secondary"
+          disabled={patch.isPending}
+          onClick={onDone}
+        >
           Cancel
-        </Button>
+        </button>
       </div>
     </div>
   );

@@ -12,6 +12,9 @@ import { MissingClerkKey } from "./components/auth/MissingClerkKey";
 import "./styles/tailwind-base.css";
 import "./styles/organic.css";
 import "./styles/app.css";
+// Scoped to `.console`; loaded after app.css so its tokens win inside that
+// subtree, and before utilities.css so a Tailwind class still overrides it.
+import "./styles/console.css";
 import "./styles/utilities.css";
 
 // Publishable keys are public by design — they ship in the client bundle and

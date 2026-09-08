@@ -49,6 +49,8 @@ web/.env.test
 web/e2e/.auth/
 web/test-results/
 web/playwright-report/
+# Design-review screenshots: regenerate them, do not track them.
+web/shots/
 *.tsbuildinfo
 
 # ---------------------------------------------------------------------------

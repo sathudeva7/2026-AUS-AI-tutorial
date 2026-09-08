@@ -8,35 +8,11 @@
  * Hours are deliberately not read here. They belong to whoever is selected,
  * not to a list nobody has clicked yet.
  */
-import { StatusChip } from "@/components/ui";
-import { EmptyNote, FailureCard } from "@/components/ui/States";
+import { FailureCard } from "@/components/ui/States";
 
 import { useUsers } from "../queries";
-import {
-  coverageLine,
-  displayInitials,
-  displayName,
-  STATUS_LABEL,
-} from "../display";
+import { coverage, displayInitials, displayName, STATUS_LABEL } from "../display";
 import type { User } from "../types";
-
-const STATUS_STYLE: Record<
-  User["status"],
-  { background: string; foreground: string }
-> = {
-  active: {
-    background: "var(--color-accent-2-200)",
-    foreground: "var(--color-accent-2-800)",
-  },
-  invited: {
-    background: "var(--color-accent-200)",
-    foreground: "var(--color-accent-800)",
-  },
-  deactivated: {
-    background: "var(--color-neutral-300)",
-    foreground: "var(--color-neutral-900)",
-  },
-};
 
 export function RosterList({
   selectedId,
@@ -51,49 +27,34 @@ export function RosterList({
   const { data, isPending, error } = useUsers();
 
   if (isPending) {
-    return (
-      <p
-        className="px-5 pb-3.5 text-[12.5px]"
-        style={{ color: "var(--color-neutral-700)" }}
-      >
-        Reading the roster…
-      </p>
-    );
+    return <p className="console-meta px-1 py-2">Reading the roster…</p>;
   }
 
   // Fail loudly (CLAUDE.md). An empty list on a dead backend reads as "this
   // agency has no counsellors", which is a different and much worse claim.
   if (error) {
     return (
-      <div className="px-3 pb-4">
+      <div className="py-2">
         <FailureCard error={error} />
       </div>
     );
   }
 
   const { users, total } = data;
+  const active = users.filter((u) => u.status === "active").length;
 
   return (
     <>
-      <p
-        className="m-0 mt-1 px-5 pb-3.5 text-[12.5px]"
-        style={{ color: "var(--color-neutral-700)" }}
-      >
-        {users.filter((u) => u.status === "active").length} active of {total} ·
-        routing is by owned country.
+      <p className="console-meta m-0 mb-3">
+        {active} active of {total}
       </p>
 
       {users.length === 0 ? (
-        <div className="px-3">
-          <EmptyNote>
-            Nobody on the roster yet. Invite a colleague to get started.
-          </EmptyNote>
-        </div>
+        <p className="console-empty m-0">
+          Nobody on the roster yet. Invite a colleague to get started.
+        </p>
       ) : (
-        <ul
-          className="m-0 flex list-none flex-col gap-1.5 p-0"
-          aria-label="Counsellors"
-        >
+        <ul className="m-0 flex list-none flex-col gap-0.5 p-0" aria-label="Counsellors">
           {users.map((user) => (
             <li key={user.id}>
               <RosterRow
@@ -118,52 +79,40 @@ function RosterRow({
   selected: boolean;
   onSelect: (userId: string) => void;
 }) {
-  const style = STATUS_STYLE[user.status];
   const name = displayName(user);
+  const { role, countries } = coverage(user);
   return (
     <button
       type="button"
+      className="console-row"
       onClick={() => onSelect(user.id)}
       aria-current={selected ? "true" : undefined}
       // The accessible name carries the status too, so a test — and a screen
       // reader — can tell "Zoe, invited" from "Zoe, active" without reading
-      // colour off a chip.
+      // colour off a dot.
       aria-label={`${name}, ${STATUS_LABEL[user.status]}`}
-      className="w-full cursor-pointer rounded-md px-3 py-2.5 text-left"
-      style={{
-        background: selected ? "var(--color-bg)" : "transparent",
-        border: `1px solid ${selected ? "var(--color-accent)" : "var(--color-divider)"}`,
-      }}
     >
-      <span className="flex items-center gap-[10px]">
-        <span
-          aria-hidden="true"
-          className="grid h-[30px] w-[30px] flex-none place-items-center rounded-pill text-[11px]"
-          style={{
-            background: "var(--color-accent-200)",
-            color: "var(--color-accent-800)",
-          }}
-        >
+      <span className="flex items-center gap-2.5">
+        <span className="console-avatar" aria-hidden="true">
           {displayInitials(user)}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13.5px] font-semibold">
-            {name}
-          </span>
-          <span
-            className="block truncate text-[11.5px]"
-            style={{ color: "var(--color-neutral-700)" }}
-          >
-            {coverageLine(user)}
+          <span className="console-row-name truncate">{name}</span>
+          {/* Role and coverage separated by space, not a dot or a dash. Both
+              are on every row, and a glyph between them is chrome that earns
+              nothing. */}
+          <span className="console-row-sub flex gap-2.5">
+            <span className="flex-none">{role}</span>
+            <span className="truncate">{countries}</span>
           </span>
         </span>
-      </span>
-      <span className="mt-2 flex items-center gap-1.5">
-        <StatusChip
-          label={STATUS_LABEL[user.status]}
-          background={style.background}
-          foreground={style.foreground}
-        />
+        <span
+          className="console-status flex-none"
+          data-status={user.status}
+          aria-hidden="true"
+        >
+          {STATUS_LABEL[user.status]}
+        </span>
       </span>
     </button>
   );

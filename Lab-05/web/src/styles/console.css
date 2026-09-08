@@ -1,0 +1,428 @@
+/* The operator console.
+ *
+ * Scoped to `.console`, not global. Organic — cream ground, Caprasimo, 16px
+ * radii — was drawn for the marketing surface and the student widget, where a
+ * warm editorial voice is right. This is a different job: a roster somebody
+ * has open for eight hours deciding who covers which country. It needs to be
+ * quiet, dense and legible, and 11px type in a display serif is none of those.
+ *
+ * Applied one route at a time. Nothing outside a `.console` subtree changes,
+ * so rolling this out is adding a class and rolling it back is removing one.
+ *
+ * The subject drives the palette. This screen is a coverage board: the useful
+ * question is which countries have an owner and which do not. So there is one
+ * accent for action, one for a gap in coverage, and no third colour competing
+ * with either.
+ */
+
+.console {
+  /* Paper rather than cream, ink rather than black. Pure #fff over pure #000
+     is the harshest pairing available and nobody reads it comfortably for a
+     working day. */
+  --c-paper: #fbfbfa;
+  --c-card: #ffffff;
+  --c-line: #e6e7e4;
+  --c-line-strong: #d3d5d0;
+
+  --c-ink: #16181d;
+  --c-ink-body: #3c4149;
+  --c-ink-muted: #6b7280;
+  --c-ink-faint: #9ca3ab;
+
+  /* Deep teal: institutional without being the corporate navy every B2B tool
+     reaches for, and far from the terracotta this replaces. */
+  --c-accent: #0e5f52;
+  --c-accent-hover: #0a4a40;
+  --c-accent-soft: #e8f2ef;
+
+  /* A gap in coverage is not an error — leads still reach the unassigned
+     queue. Amber says "look at this", where red would say "something broke". */
+  --c-warn: #8a5a12;
+  --c-warn-soft: #fdf6e8;
+  --c-warn-line: #ecd9b0;
+
+  --c-ok: #2f6b4f;
+  --c-ok-soft: #e7f1ea;
+  --c-danger: #a3231b;
+
+  /* 15px base. The complaint that started this was that everything was too
+     small, and it was: 13px body with 11.5px meta under it. */
+  --t-meta: 13px;
+  --t-body: 15px;
+  --t-lead: 16px;
+  --t-section: 17px;
+  --t-name: 30px;
+
+  /* Tight, consistent radii. 16px on a data card reads as a consumer app. */
+  --r-sm: 4px;
+  --r-md: 6px;
+
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--t-body);
+  line-height: 1.5;
+  color: var(--c-ink-body);
+  background: var(--c-paper);
+  /* Figures line up in a column of phone numbers and country counts. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Headings are the body face at a heavier weight. One family, used with
+   discipline, rather than a second face doing the shouting. */
+.console h1,
+.console h2,
+.console h3,
+.console h4 {
+  font-family: inherit;
+  color: var(--c-ink);
+  letter-spacing: -0.011em;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.console-name {
+  font-size: var(--t-name);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.console-section-title {
+  font-size: var(--t-section);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ *
+ * Roster
+ * ------------------------------------------------------------------ */
+
+.console-rail {
+  background: var(--c-card);
+  border-right: 1px solid var(--c-line);
+}
+
+.console-rail-title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.console-meta {
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+.console-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.console-row:hover {
+  background: #f4f5f3;
+}
+
+/* The selected row is marked by a filled left edge rather than a full border.
+   A whole-box outline on every selected item makes a list of ten look like ten
+   competing buttons. */
+.console-row[aria-current="true"] {
+  background: var(--c-accent-soft);
+  box-shadow: inset 2px 0 0 var(--c-accent);
+}
+
+.console-row:focus-visible,
+.console *:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+.console-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: #eef0ed;
+  color: var(--c-ink-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.console-row[aria-current="true"] .console-avatar {
+  background: var(--c-accent);
+  color: #fff;
+}
+
+.console-row-name {
+  display: block;
+  font-size: var(--t-body);
+  font-weight: 500;
+  color: var(--c-ink);
+}
+
+.console-row-sub {
+  display: block;
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+/* ------------------------------------------------------------------ *
+ * Status
+ * ------------------------------------------------------------------ */
+
+.console-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-ink-muted);
+}
+
+/* A dot, not a filled pill. Status appears on every row; a coloured block on
+   each one turns the list into a traffic light and buries the names. */
+.console-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.console-status[data-status="active"] {
+  color: var(--c-ok);
+}
+.console-status[data-status="invited"] {
+  color: var(--c-warn);
+}
+.console-status[data-status="deactivated"] {
+  color: var(--c-ink-faint);
+}
+
+/* ------------------------------------------------------------------ *
+ * Cards and detail
+ * ------------------------------------------------------------------ */
+
+.console-card {
+  background: var(--c-card);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+}
+
+.console-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.console-card-body {
+  padding: 16px 18px;
+}
+
+/* Label and value at the SAME size, separated by colour and weight. Shrinking
+   the label is the reflex, and it makes half the record hard to read. */
+.console-dl {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 0;
+  font-size: var(--t-body);
+}
+
+.console-dl dt {
+  color: var(--c-ink-muted);
+}
+
+.console-dl dd {
+  margin: 0;
+  color: var(--c-ink);
+}
+
+/* ------------------------------------------------------------------ *
+ * Country codes — the recurring unit on this screen
+ * ------------------------------------------------------------------ */
+
+.console-country {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-sm);
+  background: var(--c-card);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--c-ink-body);
+}
+
+.console-country[data-uncovered="true"] {
+  border-color: var(--c-warn-line);
+  background: var(--c-warn-soft);
+  color: var(--c-warn);
+}
+
+/* ------------------------------------------------------------------ *
+ * Coverage gap notice
+ * ------------------------------------------------------------------ */
+
+.console-gap {
+  border: 1px solid var(--c-warn-line);
+  border-radius: var(--r-md);
+  background: var(--c-warn-soft);
+  padding: 12px 14px;
+}
+
+.console-gap-title {
+  font-size: var(--t-body);
+  font-weight: 600;
+  color: var(--c-warn);
+}
+
+.console-gap-body {
+  margin: 4px 0 0;
+  font-size: var(--t-meta);
+  line-height: 1.55;
+  color: #6f4d1a;
+}
+
+/* ------------------------------------------------------------------ *
+ * Controls
+ * ------------------------------------------------------------------ */
+
+.console-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.console-btn[data-variant="primary"] {
+  background: var(--c-accent);
+  color: #fff;
+}
+.console-btn[data-variant="primary"]:hover:not(:disabled) {
+  background: var(--c-accent-hover);
+}
+
+.console-btn[data-variant="secondary"] {
+  background: var(--c-card);
+  border-color: var(--c-line-strong);
+  color: var(--c-ink);
+}
+.console-btn[data-variant="secondary"]:hover:not(:disabled) {
+  background: #f4f5f3;
+}
+
+.console-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.console-label {
+  display: block;
+  font-size: var(--t-meta);
+  font-weight: 500;
+  color: var(--c-ink-body);
+  margin-bottom: 5px;
+}
+
+.console-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-md);
+  background: var(--c-card);
+  font: inherit;
+  font-size: var(--t-body);
+  color: var(--c-ink);
+}
+
+.console-input:focus {
+  outline: 2px solid var(--c-accent);
+  outline-offset: -1px;
+  border-color: var(--c-accent);
+}
+
+.console-input[aria-invalid="true"] {
+  border-color: var(--c-danger);
+}
+
+.console-hint {
+  margin: 5px 0 0;
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+.console-error {
+  margin: 5px 0 0;
+  font-size: var(--t-meta);
+  color: var(--c-danger);
+}
+
+.console-empty {
+  font-size: var(--t-body);
+  color: var(--c-ink-muted);
+  line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .console * {
+    transition: none !important;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared components, restyled inside the console
+ *
+ * `Select` is used across the product and carries Organic's pill radius and
+ * cream fill. Rather than fork it, its `.input` class is re-declared here so
+ * the same component reads as a console control in this subtree and is
+ * untouched everywhere else.
+ * ------------------------------------------------------------------ */
+
+.console .input {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-md);
+  background: var(--c-card);
+  font-family: inherit;
+  font-size: var(--t-body);
+  color: var(--c-ink);
+  box-shadow: none;
+}
+
+.console .input:focus,
+.console .input:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: -1px;
+  border-color: var(--c-accent);
+}
+
+/* The dial-code control sits beside the number and should not claim half the
+   row: it holds two glyphs and a code. */
+.console-dial {
+  width: 116px;
+  flex: none;
+}
