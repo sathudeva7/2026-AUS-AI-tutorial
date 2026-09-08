@@ -35,9 +35,13 @@ export function useUsers(
  *  opening the roster does not fetch anybody's hours. */
 export function useUserAvailability(userId: string | null) {
   return useQuery({
-    queryKey: usersKeys.availability(userId ?? "none"),
-    queryFn: () => api.getUserAvailability(userId as string),
-    enabled: Boolean(userId),
+    // `userId!` rather than a "none" placeholder. The placeholder created a
+    // real cache entry keyed on a person who does not exist, which would sit
+    // in the cache forever and show up in any key-prefix invalidation.
+    // `enabled` already guarantees the queryFn never runs without an id.
+    queryKey: usersKeys.availability(userId!),
+    queryFn: () => api.getUserAvailability(userId!),
+    enabled: userId !== null,
   });
 }
 
@@ -62,8 +66,9 @@ export function usePatchUser(userId: string) {
       timezone?: string;
     }) => api.patchUser(userId, fields),
     onSuccess: () => {
+      // The lists only. There is no per-user query to invalidate — the detail
+      // panel reads the person out of this same cached list.
       void qc.invalidateQueries({ queryKey: usersKeys.lists() });
-      void qc.invalidateQueries({ queryKey: usersKeys.detail(userId) });
     },
   });
 }
@@ -75,9 +80,8 @@ export function useSetUserCountries(userId: string) {
       api.setUserCountries(userId, countries),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: usersKeys.lists() });
-      void qc.invalidateQueries({ queryKey: usersKeys.detail(userId) });
-      // Country ownership decides which leads this person SEES. Anything
-      // rendering a lead list is now looking at a stale answer.
+      // Country ownership decides which leads this person SEES. A no-op until
+      // leads moves behind a query — see leadsKeyRoot.
       void qc.invalidateQueries({ queryKey: leadsKeyRoot });
     },
   });

@@ -13,13 +13,24 @@ export const usersKeys = {
   lists: () => [...usersKeys.all, "list"] as const,
   list: (params: { status?: string; limit?: number; offset?: number }) =>
     [...usersKeys.lists(), params] as const,
-  detail: (userId: string) => [...usersKeys.all, "detail", userId] as const,
   availability: (userId: string) =>
     [...usersKeys.all, "availability", userId] as const,
 };
 
 /** Leads live in another feature, but deactivating someone moves their open
- *  leads to the unassigned queue — so a users mutation has to invalidate a
- *  leads query. Named here so that cross-feature link is visible rather than
- *  a bare string appearing in a mutation nobody associates with leads. */
+ *  leads to the unassigned queue and changing their countries changes which
+ *  leads they can see — so a users mutation has to invalidate a leads query.
+ *
+ *  **This is a no-op today, and saying so is the point.** DashboardRoute reads
+ *  leads with useEffect and repo.listLeads, not through this cache, so nothing
+ *  is listening on this key: the invalidation fires and no refetch happens.
+ *
+ *  It stays because the requirement is real and easy to lose. When leads moves
+ *  behind a query it must use THIS key, and then the two mutations that
+ *  reference it start working without anyone having to remember why.
+ *
+ *  There is no `detail` key: the panel reads the person out of the list cache,
+ *  so a per-user query does not exist. A key nothing reads reads as coverage
+ *  and is not.
+ */
 export const leadsKeyRoot = ["leads"] as const;
