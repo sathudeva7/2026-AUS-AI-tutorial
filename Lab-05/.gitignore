@@ -13,6 +13,10 @@
 .env.*
 *.env
 !.env.example
+# The Playwright template too. It carries variable NAMES and a note on what
+# kind of Clerk account to use — no values. The file it describes,
+# web/.env.test, stays ignored.
+!web/.env.test.example
 
 # Anything a credential tends to land in.
 *.pem
@@ -38,6 +42,13 @@ venv/
 # ---------------------------------------------------------------------------
 web/node_modules/
 web/dist/
+
+# Playwright. .env.test holds a real Clerk account, and e2e/.auth holds a live
+# signed-in session — either one in a commit is a credential leak.
+web/.env.test
+web/e2e/.auth/
+web/test-results/
+web/playwright-report/
 *.tsbuildinfo
 
 # ---------------------------------------------------------------------------
