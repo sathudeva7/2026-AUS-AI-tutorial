@@ -5,8 +5,8 @@
  * own `features/<name>/api.ts` the day it is next worked on. Users has already
  * gone; see `features/users/api.ts`.
  *
- * The re-exports below keep existing importers working. They are a migration
- * aid, not an interface: new code imports from `@/api/*` directly.
+ * The two re-exports below are a migration aid for the files still importing
+ * from here, not an interface: new code imports from `@/api/*` directly.
  */
 import { readSse } from "@/lib/sse";
 import { AGENT_BASE_URL } from "@/api/config";
@@ -14,14 +14,10 @@ import { authHeaders, get, patch } from "@/api/client";
 import { AgentUnreachableError } from "@/api/errors";
 import type { Briefing, Lead } from "./types";
 
-export { AGENT_BASE_URL } from "@/api/config";
-export { setTokenProvider } from "@/api/client";
-export {
-  AgentUnreachableError,
-  ApiRequestError,
-  FieldValidationError,
-  NotAuthenticatedError,
-} from "@/api/errors";
+// Two re-exports, not six. The rest were migration aids for importers that
+// have since moved to `@/api/*` directly; leaving them behind makes this file
+// look like an interface rather than what it is, a shrinking remainder.
+export { AgentUnreachableError, FieldValidationError } from "@/api/errors";
 
 /** `GET /api/me` — the caller, their agency, and everything they may do.
  *

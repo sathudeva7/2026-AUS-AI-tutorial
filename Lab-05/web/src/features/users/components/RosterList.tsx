@@ -11,7 +11,12 @@
 import { FailureCard } from "@/components/ui/States";
 
 import { useUsers } from "../queries";
-import { coverage, displayInitials, displayName, STATUS_LABEL } from "../display";
+import {
+  coverage,
+  displayInitials,
+  displayName,
+  STATUS_LABEL,
+} from "../display";
 import type { User } from "../types";
 
 export function RosterList({
@@ -54,7 +59,10 @@ export function RosterList({
           Nobody on the roster yet. Invite a colleague to get started.
         </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-0.5 p-0" aria-label="Counsellors">
+        <ul
+          className="m-0 flex list-none flex-col gap-0.5 p-0"
+          aria-label="Counsellors"
+        >
           {users.map((user) => (
             <li key={user.id}>
               <RosterRow

@@ -27,10 +27,22 @@ interface RailEntry {
 
 const RAIL: RailEntry[] = [
   { to: "/widget", title: "Student widget", sub: "Intake, shortlist, booking" },
-  { to: "/leads", title: "Counsellor dashboard", sub: "Leads, profile, briefing" },
-  { to: "/assistant", title: "Counsellor assistant", sub: "Ask across your leads" },
+  {
+    to: "/leads",
+    title: "Counsellor dashboard",
+    sub: "Leads, profile, briefing",
+  },
+  {
+    to: "/assistant",
+    title: "Counsellor assistant",
+    sub: "Ask across your leads",
+  },
   { to: "/counsellors", title: "Counsellors", sub: "Roster, coverage, load" },
-  { to: "/catalogue", title: "Catalogue console", sub: "Programmes, rules, freshness" },
+  {
+    to: "/catalogue",
+    title: "Catalogue console",
+    sub: "Programmes, rules, freshness",
+  },
   { to: "/setup", title: "Tenant setup", sub: "Keys, widget, embed" },
 ];
 
@@ -73,7 +85,10 @@ export function AppShell() {
         <TenantCard />
       </aside>
 
-      <main className="nb-scroll relative flex-1 overflow-auto" style={{ minWidth: isWidget ? 0 : 1180 }}>
+      <main
+        className="nb-scroll relative flex-1 overflow-auto"
+        style={{ minWidth: isWidget ? 0 : 1180 }}
+      >
         <Outlet />
       </main>
     </div>

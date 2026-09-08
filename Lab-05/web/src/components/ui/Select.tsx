@@ -155,7 +155,9 @@ export function Select({
       setActive((a) => (a + 1) % Math.max(filtered.length, 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((a) => (a - 1 + filtered.length) % Math.max(filtered.length, 1));
+      setActive(
+        (a) => (a - 1 + filtered.length) % Math.max(filtered.length, 1),
+      );
     } else if (e.key === "Home") {
       e.preventDefault();
       setActive(0);
@@ -183,17 +185,20 @@ export function Select({
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKeyDown}
       >
-        {selected?.prefix ? <span aria-hidden="true">{selected.prefix}</span> : null}
+        {selected?.prefix ? (
+          <span aria-hidden="true">{selected.prefix}</span>
+        ) : null}
         <span
           className="flex-1 truncate"
-          style={
-            selected ? undefined : { color: "var(--color-neutral-600)" }
-          }
+          style={selected ? undefined : { color: "var(--color-neutral-600)" }}
         >
           {selected ? selected.label : placeholder}
         </span>
         {selected?.detail ? (
-          <span className="text-[12px]" style={{ color: "var(--color-neutral-600)" }}>
+          <span
+            className="text-[12px]"
+            style={{ color: "var(--color-neutral-600)" }}
+          >
             {selected.detail}
           </span>
         ) : null}
@@ -210,7 +215,10 @@ export function Select({
           }}
         >
           {searchable ? (
-            <div className="p-2" style={{ borderBottom: "1px solid var(--color-divider)" }}>
+            <div
+              className="p-2"
+              style={{ borderBottom: "1px solid var(--color-divider)" }}
+            >
               <input
                 ref={searchRef}
                 className="input"
@@ -267,7 +275,9 @@ export function Select({
                       choose(i);
                     }}
                   >
-                    {o.prefix ? <span aria-hidden="true">{o.prefix}</span> : null}
+                    {o.prefix ? (
+                      <span aria-hidden="true">{o.prefix}</span>
+                    ) : null}
                     <span className="flex-1 truncate">{o.label}</span>
                     {o.detail ? (
                       <span

@@ -37,7 +37,10 @@ if (!publishableKey) {
 } else {
   root.render(
     <StrictMode>
-      <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
+      <ClerkProvider
+        publishableKey={publishableKey}
+        appearance={clerkAppearance}
+      >
         <App />
       </ClerkProvider>
     </StrictMode>,

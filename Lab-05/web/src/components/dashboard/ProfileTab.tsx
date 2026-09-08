@@ -146,9 +146,8 @@ function FactRowView({
               The quote is not recoverable here. The backend validated one when
               it accepted this fact — it rejects any write whose words are not
               in the student&apos;s messages — but fact writes are not written
-              to the audit trail, so the sentence is not readable back after
-              the conversation. The fact is shown as recorded, not as
-              evidenced.
+              to the audit trail, so the sentence is not readable back after the
+              conversation. The fact is shown as recorded, not as evidenced.
             </span>
           )}
         </div>

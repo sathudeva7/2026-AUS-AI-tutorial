@@ -63,11 +63,7 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   elevation?: "sm" | "md" | "lg" | "none";
 }
 
-export function Card({
-  elevation = "sm",
-  className,
-  ...rest
-}: CardProps) {
+export function Card({ elevation = "sm", className, ...rest }: CardProps) {
   return (
     <div
       className={cn(
@@ -81,7 +77,13 @@ export function Card({
 }
 
 /** The 10.5px uppercase label that opens almost every card in the console. */
-export function Kicker({ children, className }: { children: ReactNode; className?: string }) {
+export function Kicker({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return <div className={cn("kicker", className)}>{children}</div>;
 }
 
@@ -235,11 +237,12 @@ function AlertMark() {
   );
 }
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
-  function Input({ className, ...rest }, ref) {
-    return <input ref={ref} className={cn("input", className)} {...rest} />;
-  },
-);
+export const Input = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement>
+>(function Input({ className, ...rest }, ref) {
+  return <input ref={ref} className={cn("input", className)} {...rest} />;
+});
 
 export const Textarea = forwardRef<
   HTMLTextAreaElement,

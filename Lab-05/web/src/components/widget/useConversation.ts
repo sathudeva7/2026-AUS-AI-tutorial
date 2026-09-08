@@ -119,7 +119,10 @@ export function useConversation(options: { initialLeadId?: string | null }) {
       // that arrives later; `checks` accumulates check_requirements output so
       // a build_shortlist card can show the requirement chips behind each
       // entry, which is the only place those two tools' results meet.
-      const pending = new Map<string, { name: string; args: Record<string, unknown> }>();
+      const pending = new Map<
+        string,
+        { name: string; args: Record<string, unknown> }
+      >();
       const checks: Record<string, RequirementCheck[]> = {};
       let replyId: string | null = null;
       let reply = "";

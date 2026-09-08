@@ -80,7 +80,12 @@ export function ShortlistCard({
   }
 
   return (
-    <div className={cn("flex flex-col gap-[10px]", variant === "page" && "max-w-[920px]")}>
+    <div
+      className={cn(
+        "flex flex-col gap-[10px]",
+        variant === "page" && "max-w-[920px]",
+      )}
+    >
       {BANDS.filter((band) => grouped.get(band.key)?.length).map((band) => (
         <div
           key={band.key}
@@ -174,7 +179,10 @@ function Entry({
               <span
                 key={check.requirement_id}
                 className="rounded-pill px-[9px] py-[3px] text-[10.5px]"
-                style={{ background: style.background, color: style.foreground }}
+                style={{
+                  background: style.background,
+                  color: style.foreground,
+                }}
               >
                 {check.reason} · {style.label}
               </span>

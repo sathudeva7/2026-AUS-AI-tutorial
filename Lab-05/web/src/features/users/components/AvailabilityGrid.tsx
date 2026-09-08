@@ -200,8 +200,12 @@ function Grid({
               const date = addDays(weekStart, i);
               return (
                 <div key={day} className="console-grid-day">
-                  <span className="console-grid-day-name">{DAY_LABEL[day]}</span>{" "}
-                  <span className="console-grid-day-date">{date.getDate()}</span>
+                  <span className="console-grid-day-name">
+                    {DAY_LABEL[day]}
+                  </span>{" "}
+                  <span className="console-grid-day-date">
+                    {date.getDate()}
+                  </span>
                 </div>
               );
             })}
@@ -243,10 +247,15 @@ function Grid({
 
         {offGrid.length ? (
           <p className="console-hint mt-3">
-            {offGrid.length === 1 ? "One window is" : `${offGrid.length} windows are`}{" "}
+            {offGrid.length === 1
+              ? "One window is"
+              : `${offGrid.length} windows are`}{" "}
             not on the half-hour and cannot be drawn here:{" "}
             {offGrid
-              .map((r) => `${DAY_LABEL[r.day_of_week]} ${r.start_time}–${r.end_time}`)
+              .map(
+                (r) =>
+                  `${DAY_LABEL[r.day_of_week]} ${r.start_time}–${r.end_time}`,
+              )
               .join(", ")}
             . They are kept exactly as they are.
           </p>
@@ -318,7 +327,10 @@ function Row({
 }) {
   return (
     <>
-      <div className="console-grid-time" data-hour={onHour ? "true" : undefined}>
+      <div
+        className="console-grid-time"
+        data-hour={onHour ? "true" : undefined}
+      >
         {onHour ? formatMinutes(slot * SLOT_MINUTES) : ""}
       </div>
       {COLUMN_DAYS.map((day) => {
@@ -338,7 +350,9 @@ function Row({
             aria-pressed={on}
             aria-label={`${label}, ${on ? "available" : "not available"}`}
             onMouseDown={() => onPaintStart(day, !on)}
-            onMouseEnter={() => (painting !== null ? onPaintOver(day) : undefined)}
+            onMouseEnter={() =>
+              painting !== null ? onPaintOver(day) : undefined
+            }
             onClick={(e) => {
               // A plain click (no drag) still toggles: mousedown already did
               // the work, so only act on keyboard-generated clicks.

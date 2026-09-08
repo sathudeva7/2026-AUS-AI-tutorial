@@ -2,7 +2,7 @@
  *  `student_agent/api/users.py`; keep the two in step. */
 
 export type Role = "counsellor" | "manager" | "owner";
-export type UserStatus = "active" | "invited" | "deactivated";
+type UserStatus = "active" | "invited" | "deactivated";
 
 export interface User {
   id: string;

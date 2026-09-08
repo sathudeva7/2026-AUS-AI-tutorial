@@ -32,8 +32,8 @@ export function TranscriptTab({ leadId }: { leadId: string }) {
     return (
       <EmptyNote>
         No conversation is on record for this lead. Messages are written as the
-        agent runs — open this lead in the student widget
-        (<code>/widget?lead_id={leadId}</code>) and the exchange appears here.
+        agent runs — open this lead in the student widget (
+        <code>/widget?lead_id={leadId}</code>) and the exchange appears here.
       </EmptyNote>
     );
   }

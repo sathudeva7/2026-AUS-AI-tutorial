@@ -84,9 +84,7 @@ export function DashboardRoute() {
             className="m-0 mt-1 text-[12.5px]"
             style={{ color: "var(--color-neutral-700)" }}
           >
-            {leads
-              ? summarise(leads)
-              : "Reading the lead book…"}
+            {leads ? summarise(leads) : "Reading the lead book…"}
           </p>
         </div>
         <div className="nb-scroll flex flex-col gap-1.5 overflow-y-auto px-3 pb-4">
@@ -231,8 +229,8 @@ function LeadDetail({
             className="m-0 mt-1.5 max-w-[70ch] text-[13px]"
             style={{ color: "var(--color-neutral-700)" }}
           >
-            {wantLine(briefing.facts)} · profile{" "}
-            {profileCompleteness(briefing)}% complete ·{" "}
+            {wantLine(briefing.facts)} · profile {profileCompleteness(briefing)}
+            % complete ·{" "}
             {briefing.assigned_counsellor_id
               ? `assigned to ${briefing.assigned_counsellor_id}`
               : "in the unassigned queue — no active counsellor owns this destination"}

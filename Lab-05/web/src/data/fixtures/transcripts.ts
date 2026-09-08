@@ -28,14 +28,24 @@ function m(
 
 export const TRANSCRIPTS: Record<string, Message[]> = {
   lead_001: [
-    m("lead_001", "student", "2026-08-28T09:14:00Z", "I want to do my masters in the UK"),
+    m(
+      "lead_001",
+      "student",
+      "2026-08-28T09:14:00Z",
+      "I want to do my masters in the UK",
+    ),
     m(
       "lead_001",
       "agent",
       "2026-08-28T09:14:30Z",
       "Good evening. I'm Northbound's assistant — I'm an AI, and I can start your assessment now rather than waiting for office hours. What field are you looking at?",
     ),
-    m("lead_001", "student", "2026-08-28T09:15:00Z", "something in data science or analytics"),
+    m(
+      "lead_001",
+      "student",
+      "2026-08-28T09:15:00Z",
+      "something in data science or analytics",
+    ),
     m(
       "lead_001",
       "agent",

@@ -19,7 +19,7 @@
 import type { Fact, FactKey } from "../types";
 
 export const SEED_QUOTES: Record<string, Partial<Record<FactKey, Fact>>> = {
-  "lead_001": {
+  lead_001: {
     target_country: {
       value: "UK",
       source_quote: "I want to do my masters in the UK",
@@ -32,7 +32,8 @@ export const SEED_QUOTES: Record<string, Partial<Record<FactKey, Fact>>> = {
     },
     qualification: {
       value: "3-year BSc Computer Science, Delhi University",
-      source_quote: "I did my BSc in Computer Science at Delhi University, it was a 3 year course",
+      source_quote:
+        "I did my BSc in Computer Science at Delhi University, it was a 3 year course",
       stated_at: "2026-08-28T09:17:00Z",
     },
     grades: {
@@ -56,14 +57,14 @@ export const SEED_QUOTES: Record<string, Partial<Record<FactKey, Fact>>> = {
       stated_at: "2026-08-28T09:22:00Z",
     },
   },
-  "lead_002": {
+  lead_002: {
     target_country: {
       value: "Canada",
       source_quote: "hi, im interested in studying in canada",
       stated_at: "2026-09-01T16:40:00Z",
     },
   },
-  "lead_003": {
+  lead_003: {
     target_country: {
       value: "Germany",
       source_quote: "I'm set on Germany, my brother studied in Aachen",
@@ -75,8 +76,10 @@ export const SEED_QUOTES: Record<string, Partial<Record<FactKey, Fact>>> = {
       stated_at: "2026-08-30T11:03:00Z",
     },
     qualification: {
-      value: "4-year BEng Mechanical Engineering, American University of Sharjah",
-      source_quote: "I have a 4 year BEng in Mechanical Engineering from American University of Sharjah",
+      value:
+        "4-year BEng Mechanical Engineering, American University of Sharjah",
+      source_quote:
+        "I have a 4 year BEng in Mechanical Engineering from American University of Sharjah",
       stated_at: "2026-08-30T11:05:00Z",
     },
     grades: {
@@ -91,7 +94,8 @@ export const SEED_QUOTES: Record<string, Partial<Record<FactKey, Fact>>> = {
     },
     budget_per_year: {
       value: 15000,
-      source_quote: "I can cover about 15000 euros a year including living costs",
+      source_quote:
+        "I can cover about 15000 euros a year including living costs",
       stated_at: "2026-08-30T11:09:00Z",
     },
     intended_intake: {
@@ -100,7 +104,7 @@ export const SEED_QUOTES: Record<string, Partial<Record<FactKey, Fact>>> = {
       stated_at: "2026-08-30T11:10:00Z",
     },
   },
-  "lead_004": {
+  lead_004: {
     target_country: {
       value: "Australia",
       source_quote: "Australia is my first choice",
@@ -113,7 +117,8 @@ export const SEED_QUOTES: Record<string, Partial<Record<FactKey, Fact>>> = {
     },
     qualification: {
       value: "4-year Bachelor of Engineering in Software Engineering",
-      source_quote: "I have a four year Bachelor of Engineering in Software Engineering",
+      source_quote:
+        "I have a four year Bachelor of Engineering in Software Engineering",
       stated_at: "2026-08-26T03:34:00Z",
     },
     grades: {
@@ -137,7 +142,7 @@ export const SEED_QUOTES: Record<string, Partial<Record<FactKey, Fact>>> = {
       stated_at: "2026-08-26T03:39:00Z",
     },
   },
-  "lead_005": {
+  lead_005: {
     target_country: {
       value: "UK",
       source_quote: "I applied for the UK last year",

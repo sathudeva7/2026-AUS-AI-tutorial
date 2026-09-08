@@ -19,11 +19,7 @@
 export type Verdict = "pass" | "fail" | "indeterminate";
 
 export type LeadStatus =
-  | "active"
-  | "parked"
-  | "escalated"
-  | "withdrawn"
-  | "converted";
+  "active" | "parked" | "escalated" | "withdrawn" | "converted";
 
 /** Escalation is rule-driven, so the triggers are a closed set rather than
  *  free text the model composes. */

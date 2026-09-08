@@ -8,18 +8,16 @@
  */
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Card, ReadonlyValue, StatusChip, Table } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ReadonlyValue,
+  StatusChip,
+  Table,
+} from "@/components/ui";
 import { Tabs, TabPanel } from "@/components/ui/Tabs";
-import {
-  decideRefreshItem,
-  useCatalogue,
-} from "@/data/catalogueStore";
-import {
-  formatDate,
-  formatMoney,
-  isStale,
-  verifiedLabel,
-} from "@/lib/format";
+import { decideRefreshItem, useCatalogue } from "@/data/catalogueStore";
+import { formatDate, formatMoney, isStale, verifiedLabel } from "@/lib/format";
 import type { Programme, RefreshItem } from "@/data/types";
 
 type TabValue = "programmes" | "rules" | "freshness";
@@ -252,7 +250,10 @@ export function RuleGrid({
           }}
         >
           <ReadonlyValue>{requirement.key.replace(/_/g, " ")}</ReadonlyValue>
-          <ReadonlyValue className="figure text-center" title={requirement.rule}>
+          <ReadonlyValue
+            className="figure text-center"
+            title={requirement.rule}
+          >
             {requirement.rule}
           </ReadonlyValue>
           <ReadonlyValue muted>{requirement.description}</ReadonlyValue>
@@ -278,8 +279,8 @@ export function RuleGrid({
             color: "var(--color-neutral-700)",
           }}
         >
-          No requirements yet. A programme with none matches every student, which
-          is rarely what you mean.
+          No requirements yet. A programme with none matches every student,
+          which is rarely what you mean.
         </div>
       ) : null}
     </div>
@@ -322,9 +323,9 @@ function FreshnessTab({ items }: { items: RefreshItem[] }) {
         style={{ color: "var(--color-neutral-700)" }}
       >
         The refresh job searches official sources overnight and diffs what it
-        finds against the stored values. It never writes to the catalogue
-        itself — approving one of these is the only way a retrieved figure
-        becomes one the agent is allowed to state.
+        finds against the stored values. It never writes to the catalogue itself
+        — approving one of these is the only way a retrieved figure becomes one
+        the agent is allowed to state.
       </p>
 
       {items.map((item) => {
@@ -356,7 +357,10 @@ function FreshnessTab({ items }: { items: RefreshItem[] }) {
               >
                 {item.was}
               </span>
-              <span style={{ color: "var(--color-neutral-600)" }} aria-label="becomes">
+              <span
+                style={{ color: "var(--color-neutral-600)" }}
+                aria-label="becomes"
+              >
                 →
               </span>
               <span

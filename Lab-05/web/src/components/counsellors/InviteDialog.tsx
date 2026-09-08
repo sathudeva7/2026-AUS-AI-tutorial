@@ -31,10 +31,7 @@ export interface InviteDraft {
 }
 
 type RoleName =
-  | "Senior counsellor"
-  | "Counsellor"
-  | "Junior counsellor"
-  | "Branch manager";
+  "Senior counsellor" | "Counsellor" | "Junior counsellor" | "Branch manager";
 
 type PermissionKey = "transcripts" | "catalogue" | "refresh" | "keys";
 
@@ -117,11 +114,14 @@ export function InviteDialog({
   const [languages, setLanguages] = useState<string[]>([]);
   const [cap, setCap] = useState<number | null>(null);
   const [escalations, setEscalations] = useState(false);
-  const [perms, setPerms] = useState<Partial<Record<PermissionKey, boolean>>>({});
+  const [perms, setPerms] = useState<Partial<Record<PermissionKey, boolean>>>(
+    {},
+  );
 
   const effectiveCap = cap ?? capFor(role);
   // A junior counsellor never receives escalations, whatever the toggle says.
-  const effectiveEscalations = role === "Junior counsellor" ? false : escalations;
+  const effectiveEscalations =
+    role === "Junior counsellor" ? false : escalations;
   const adminOnly = role === "Branch manager";
 
   // The domain check that used to live here is gone, and deliberately.
@@ -135,7 +135,8 @@ export function InviteDialog({
   // is minted for ONE address, delivered to it, and only the person holding
   // that mail can accept. Membership, not domain, is what makes someone part
   // of the agency.
-  const emailBad = email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const emailBad =
+    email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const ready =
     name.trim().length > 2 &&
     !emailBad &&
@@ -261,7 +262,11 @@ export function InviteDialog({
 
       <section>
         <Kicker>Role</Kicker>
-        <div className="mt-2 flex flex-col gap-2" role="radiogroup" aria-label="Role">
+        <div
+          className="mt-2 flex flex-col gap-2"
+          role="radiogroup"
+          aria-label="Role"
+        >
           {ROLES.map((option) => {
             const on = role === option.label;
             return (
@@ -284,7 +289,9 @@ export function InviteDialog({
                 <span
                   className="mt-0.5 h-4 w-4 flex-none rounded-pill border-2"
                   style={{
-                    background: on ? "var(--color-accent-2-600)" : "transparent",
+                    background: on
+                      ? "var(--color-accent-2-600)"
+                      : "transparent",
                     borderColor: on
                       ? "var(--color-accent-2-600)"
                       : "var(--color-neutral-400)",

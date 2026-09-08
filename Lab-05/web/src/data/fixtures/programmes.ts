@@ -29,7 +29,8 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-02", "2027-07"],
     application_deadline: "2026-12-15",
     verified_at: "2026-08-20",
-    source_url: "https://darlingharbour.example/courses/master-of-information-technology",
+    source_url:
+      "https://darlingharbour.example/courses/master-of-information-technology",
     requirements: [
       {
         requirement_id: "p_au_002_r1",
@@ -65,7 +66,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -88,7 +89,8 @@ export const PROGRAMMES: Programme[] = [
         requirement_id: "p_au_004_r1",
         key: "qualification",
         rule: "bachelor_years>=4",
-        description: "A four-year bachelor's degree in computing or engineering.",
+        description:
+          "A four-year bachelor's degree in computing or engineering.",
         mandatory: true,
       },
       {
@@ -118,7 +120,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -171,7 +173,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -188,7 +190,8 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-02"],
     application_deadline: "2026-11-15",
     verified_at: "2026-08-20",
-    source_url: "https://swanriver.example/courses/master-of-business-analytics",
+    source_url:
+      "https://swanriver.example/courses/master-of-business-analytics",
     requirements: [
       {
         requirement_id: "p_au_003_r1",
@@ -224,7 +227,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -247,14 +250,16 @@ export const PROGRAMMES: Programme[] = [
         requirement_id: "p_ca_001_r1",
         key: "qualification",
         rule: "bachelor_years>=4",
-        description: "A four-year bachelor's degree from a recognised institution.",
+        description:
+          "A four-year bachelor's degree from a recognised institution.",
         mandatory: true,
       },
       {
         requirement_id: "p_ca_001_r2",
         key: "grades",
         rule: "percentage>=70",
-        description: "A B+ average or international equivalent (70% and above).",
+        description:
+          "A B+ average or international equivalent (70% and above).",
         mandatory: true,
       },
       {
@@ -277,7 +282,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -294,20 +299,23 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-01", "2027-09"],
     application_deadline: "2027-02-15",
     verified_at: "2026-08-22",
-    source_url: "https://lakeshoreuniversity.example/courses/msc-computer-science",
+    source_url:
+      "https://lakeshoreuniversity.example/courses/msc-computer-science",
     requirements: [
       {
         requirement_id: "p_ca_003_r1",
         key: "qualification",
         rule: "bachelor_years>=4",
-        description: "A four-year bachelor's degree in computing or a related field.",
+        description:
+          "A four-year bachelor's degree in computing or a related field.",
         mandatory: true,
       },
       {
         requirement_id: "p_ca_003_r2",
         key: "grades",
         rule: "percentage>=75",
-        description: "An A- average or international equivalent (75% and above).",
+        description:
+          "An A- average or international equivalent (75% and above).",
         mandatory: true,
       },
       {
@@ -330,7 +338,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -347,20 +355,23 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-09"],
     application_deadline: "2027-02-01",
     verified_at: "2026-08-22",
-    source_url: "https://rideauuniversity.example/courses/master-of-public-health",
+    source_url:
+      "https://rideauuniversity.example/courses/master-of-public-health",
     requirements: [
       {
         requirement_id: "p_ca_002_r1",
         key: "qualification",
         rule: "bachelor_years>=4",
-        description: "A four-year bachelor's degree in health or life sciences.",
+        description:
+          "A four-year bachelor's degree in health or life sciences.",
         mandatory: true,
       },
       {
         requirement_id: "p_ca_002_r2",
         key: "grades",
         rule: "percentage>=70",
-        description: "A B+ average or international equivalent (70% and above).",
+        description:
+          "A B+ average or international equivalent (70% and above).",
         mandatory: true,
       },
       {
@@ -383,7 +394,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -400,7 +411,8 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-04", "2027-10"],
     application_deadline: "2027-02-28",
     verified_at: "2026-08-25",
-    source_url: "https://bavarianinstitute.example/courses/msc-production-engineering",
+    source_url:
+      "https://bavarianinstitute.example/courses/msc-production-engineering",
     requirements: [
       {
         requirement_id: "p_de_003_r1",
@@ -436,7 +448,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -453,7 +465,8 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-10"],
     application_deadline: "2027-03-31",
     verified_at: "2026-08-25",
-    source_url: "https://hansestadtuniversity.example/courses/msc-automotive-systems",
+    source_url:
+      "https://hansestadtuniversity.example/courses/msc-automotive-systems",
     requirements: [
       {
         requirement_id: "p_de_002_r1",
@@ -489,7 +502,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -506,13 +519,15 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-04", "2027-10"],
     application_deadline: "2027-01-15",
     verified_at: "2026-08-25",
-    source_url: "https://rheinlandtechnical.example/courses/msc-mechanical-engineering",
+    source_url:
+      "https://rheinlandtechnical.example/courses/msc-mechanical-engineering",
     requirements: [
       {
         requirement_id: "p_de_001_r1",
         key: "qualification",
         rule: "bachelor_years>=4",
-        description: "A four-year bachelor's degree in mechanical or production engineering.",
+        description:
+          "A four-year bachelor's degree in mechanical or production engineering.",
         mandatory: true,
       },
       {
@@ -542,7 +557,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -559,7 +574,8 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-09"],
     application_deadline: "2027-06-30",
     verified_at: "2026-08-14",
-    source_url: "https://camdenmetropolitan.example/courses/msc-business-analytics",
+    source_url:
+      "https://camdenmetropolitan.example/courses/msc-business-analytics",
     requirements: [
       {
         requirement_id: "p_uk_005_r1",
@@ -595,7 +611,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -648,7 +664,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -665,13 +681,15 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-01", "2027-09"],
     application_deadline: "2027-07-01",
     verified_at: "2026-08-14",
-    source_url: "https://northgateuniversity.example/courses/msc-computer-science-conversion",
+    source_url:
+      "https://northgateuniversity.example/courses/msc-computer-science-conversion",
     requirements: [
       {
         requirement_id: "p_uk_004_r1",
         key: "qualification",
         rule: "bachelor_years>=3",
-        description: "Any three-year bachelor's degree; no computing background required.",
+        description:
+          "Any three-year bachelor's degree; no computing background required.",
         mandatory: true,
       },
       {
@@ -701,7 +719,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -718,13 +736,15 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-09"],
     application_deadline: "2027-07-15",
     verified_at: "2026-08-14",
-    source_url: "https://riverforduniversity.example/courses/msc-applied-data-analytics",
+    source_url:
+      "https://riverforduniversity.example/courses/msc-applied-data-analytics",
     requirements: [
       {
         requirement_id: "p_uk_002_r1",
         key: "qualification",
         rule: "bachelor_years>=3",
-        description: "A three-year bachelor's degree is accepted for this programme.",
+        description:
+          "A three-year bachelor's degree is accepted for this programme.",
         mandatory: true,
       },
       {
@@ -754,7 +774,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
   {
@@ -771,20 +791,23 @@ export const PROGRAMMES: Programme[] = [
     intakes: ["2027-09"],
     application_deadline: "2027-05-31",
     verified_at: "2026-08-14",
-    source_url: "https://thamesideuniversity.example/courses/msc-artificial-intelligence",
+    source_url:
+      "https://thamesideuniversity.example/courses/msc-artificial-intelligence",
     requirements: [
       {
         requirement_id: "p_uk_003_r1",
         key: "qualification",
         rule: "bachelor_years>=3",
-        description: "A three-year bachelor's degree in computing or mathematics.",
+        description:
+          "A three-year bachelor's degree in computing or mathematics.",
         mandatory: true,
       },
       {
         requirement_id: "p_uk_003_r2",
         key: "grades",
         rule: "percentage>=70",
-        description: "A strong 2:1 or international equivalent (70% and above).",
+        description:
+          "A strong 2:1 or international equivalent (70% and above).",
         mandatory: true,
       },
       {
@@ -807,7 +830,7 @@ export const PROGRAMMES: Programme[] = [
         rule: "tuition_per_year<=budget_per_year",
         description: "Annual tuition must sit within your stated budget.",
         mandatory: false,
-      }
+      },
     ],
   },
 ];

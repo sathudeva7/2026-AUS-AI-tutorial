@@ -140,8 +140,18 @@ export function formatIntake(intake: string): string {
   const [year, month] = intake.split("-");
   const index = Number(month) - 1;
   const names = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
   return names[index] ? `${names[index]} ${year}` : intake;
 }
@@ -180,7 +190,8 @@ export function humanise(value: string): string {
 export function numericFact(
   value: string | number | undefined | null,
 ): number | undefined {
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? value : undefined;
   if (typeof value !== "string") return undefined;
   const cleaned = value.trim().replace(/,/g, "");
   if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return undefined;

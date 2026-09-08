@@ -157,7 +157,10 @@ export function AgencyDetailsCard() {
     return (
       <Card className="rounded-md p-[18px]">
         <CardTitle className="mb-3">Agency details</CardTitle>
-        <p className="m-0 text-[13px]" style={{ color: "var(--color-accent-800)" }}>
+        <p
+          className="m-0 text-[13px]"
+          style={{ color: "var(--color-accent-800)" }}
+        >
           {loadError}
         </p>
       </Card>
@@ -168,7 +171,10 @@ export function AgencyDetailsCard() {
     return (
       <Card className="rounded-md p-[18px]">
         <CardTitle className="mb-3">Agency details</CardTitle>
-        <p className="m-0 text-[13px]" style={{ color: "var(--color-neutral-600)" }}>
+        <p
+          className="m-0 text-[13px]"
+          style={{ color: "var(--color-neutral-600)" }}
+        >
           Loading…
         </p>
       </Card>
@@ -231,7 +237,9 @@ export function AgencyDetailsCard() {
               disabled={locked}
               aria-invalid={Boolean(errors.phone)}
               style={
-                errors.phone ? { borderColor: "var(--color-danger)" } : undefined
+                errors.phone
+                  ? { borderColor: "var(--color-danger)" }
+                  : undefined
               }
               onChange={(e) => set("national", e.target.value)}
             />
@@ -248,7 +256,11 @@ export function AgencyDetailsCard() {
           />
         </Field>
 
-        <Field label="Address line 2" htmlFor="agency-a2" error={errors.address_line2}>
+        <Field
+          label="Address line 2"
+          htmlFor="agency-a2"
+          error={errors.address_line2}
+        >
           <Input
             id="agency-a2"
             value={draft.address_line2}
@@ -265,14 +277,16 @@ export function AgencyDetailsCard() {
               disabled={locked}
               aria-invalid={Boolean(errors.city)}
               style={
-                errors.city
-                  ? { borderColor: "var(--color-danger)" }
-                  : undefined
+                errors.city ? { borderColor: "var(--color-danger)" } : undefined
               }
               onChange={(e) => set("city", e.target.value)}
             />
           </Field>
-          <Field label="Region or province" htmlFor="agency-region" error={errors.region}>
+          <Field
+            label="Region or province"
+            htmlFor="agency-region"
+            error={errors.region}
+          >
             <Input
               id="agency-region"
               value={draft.region}
@@ -283,7 +297,11 @@ export function AgencyDetailsCard() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Postal code" htmlFor="agency-postal" error={errors.postal_code}>
+          <Field
+            label="Postal code"
+            htmlFor="agency-postal"
+            error={errors.postal_code}
+          >
             <Input
               id="agency-postal"
               value={draft.postal_code}

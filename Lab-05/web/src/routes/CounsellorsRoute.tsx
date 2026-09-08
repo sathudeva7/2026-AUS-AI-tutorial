@@ -48,7 +48,9 @@ export function CounsellorsRoute() {
   // async with nothing cancelling it — could settle out of order and leave the
   // banner describing a roster that had already changed.
   const owned = new Set(
-    (users ?? []).filter((u) => u.status === "active").flatMap((u) => u.countries),
+    (users ?? [])
+      .filter((u) => u.status === "active")
+      .flatMap((u) => u.countries),
   );
   // The catalogue names countries; users own codes. Normalise before
   // comparing, or nothing ever matches and everything reads as a gap.

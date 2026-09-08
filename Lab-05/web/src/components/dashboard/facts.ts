@@ -15,7 +15,12 @@
  */
 import { SEED_QUOTES } from "@/data/fixtures/seedQuotes";
 import { sessionQuotes } from "@/data/session";
-import { FACT_LABELS, type Briefing, type Fact, type FactKey } from "@/data/types";
+import {
+  FACT_LABELS,
+  type Briefing,
+  type Fact,
+  type FactKey,
+} from "@/data/types";
 
 export type FactState = "Confirmed" | "Missing";
 
@@ -38,7 +43,10 @@ export interface FactGroup {
 }
 
 const GROUPS: { name: string; keys: FactKey[] }[] = [
-  { name: "Intent", keys: ["target_country", "field_of_study", "intended_intake"] },
+  {
+    name: "Intent",
+    keys: ["target_country", "field_of_study", "intended_intake"],
+  },
   { name: "Academic", keys: ["qualification", "grades"] },
   { name: "English", keys: ["english_test"] },
   { name: "Financial", keys: ["budget_per_year"] },

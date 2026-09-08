@@ -38,7 +38,7 @@ export function MissingClerkKey() {
             color: "var(--color-neutral-100)",
           }}
         >
-{`cd Lab-05/web
+          {`cd Lab-05/web
 clerk env pull          # or paste the key from dashboard.clerk.com
 npm run dev`}
         </pre>
@@ -46,8 +46,8 @@ npm run dev`}
           className="mb-0 mt-3 text-[11.5px]"
           style={{ color: "var(--color-neutral-700)" }}
         >
-          The publishable key is safe in client code. The secret key is not —
-          it belongs in <code>Lab-05/.env</code>, never under <code>web/</code>.
+          The publishable key is safe in client code. The secret key is not — it
+          belongs in <code>Lab-05/.env</code>, never under <code>web/</code>.
         </p>
       </div>
     </div>

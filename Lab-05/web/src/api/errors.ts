@@ -16,7 +16,7 @@ import { AGENT_BASE_URL } from "./config";
  * this, 401 returned `detail` as a string and 422 returned it as an array,
  * so every caller had to guess which it had this time.
  */
-export interface ApiErrorBody {
+interface ApiErrorBody {
   code: string;
   message: string;
   details?: { field: string; issue: string }[];

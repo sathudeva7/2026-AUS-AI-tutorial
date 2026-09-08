@@ -111,7 +111,8 @@ export const TRIGGER_LABELS: Record<string, string> = {
   low_confidence: "Shortlist confidence below the floor",
   student_requested_human: "Student asked for a person",
   visa_or_immigration_advice: "Visa or immigration advice requested",
-  system_failure: "System failure — the agent could not answer without guessing",
+  system_failure:
+    "System failure — the agent could not answer without guessing",
 };
 
 export function triggerLabel(trigger: string): string {

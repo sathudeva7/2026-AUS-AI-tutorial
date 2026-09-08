@@ -53,7 +53,10 @@ export function AssistantRoute() {
         answered from stored tool results rather than recomputed.
       </p>
 
-      <form onSubmit={submit} className="my-[22px] flex items-center gap-[10px]">
+      <form
+        onSubmit={submit}
+        className="my-[22px] flex items-center gap-[10px]"
+      >
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -175,10 +178,10 @@ function NotConnected({ question }: { question: string }) {
         style={{ color: "var(--color-accent-800)" }}
       >
         The counsellor agent is a separate read-only service and it is not
-        running, so there is nothing to answer{" "}
-        <q>{question}</q> from. Rather than compose something plausible about a
-        real student&apos;s file, this surface stops here. The suggested
-        questions above are answered from stored evaluations and still work.
+        running, so there is nothing to answer <q>{question}</q> from. Rather
+        than compose something plausible about a real student&apos;s file, this
+        surface stops here. The suggested questions above are answered from
+        stored evaluations and still work.
       </p>
     </Card>
   );

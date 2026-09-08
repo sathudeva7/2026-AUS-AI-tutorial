@@ -23,8 +23,9 @@ export function ShortlistTab({ briefing }: { briefing: Briefing }) {
       shortlist: parseShortlist(call.result),
       at: call.timestamp,
     }))
-    .filter((r): r is { shortlist: NonNullable<typeof r.shortlist>; at: string } =>
-      Boolean(r.shortlist),
+    .filter(
+      (r): r is { shortlist: NonNullable<typeof r.shortlist>; at: string } =>
+        Boolean(r.shortlist),
     );
 
   // Checks recorded at any point for this lead, newest write winning. A

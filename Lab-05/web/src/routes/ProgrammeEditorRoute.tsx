@@ -34,7 +34,12 @@ const LEVELS = ["masters", "bachelors", "phd", "foundation"];
 /** Requirement templates. `key` must be one of the seven fact keys — a rule
  *  keyed on anything else can never be evaluated, because there is no fact to
  *  evaluate it against. */
-const TEMPLATES: { label: string; key: FactKey; rule: string; description: string }[] = [
+const TEMPLATES: {
+  label: string;
+  key: FactKey;
+  rule: string;
+  description: string;
+}[] = [
   {
     label: "Degree length",
     key: "qualification",
@@ -327,10 +332,10 @@ export function ProgrammeEditorRoute() {
             className="mb-3.5 mt-0 max-w-[76ch] text-[12.5px]"
             style={{ color: "var(--color-neutral-700)" }}
           >
-            Requirements are data, not prose. Each row evaluates to MET,
-            NOT_MET or INDETERMINATE against a student&apos;s stated facts, and
-            a row keyed on a fact they have never stated comes back
-            INDETERMINATE rather than failing them.
+            Requirements are data, not prose. Each row evaluates to MET, NOT_MET
+            or INDETERMINATE against a student&apos;s stated facts, and a row
+            keyed on a fact they have never stated comes back INDETERMINATE
+            rather than failing them.
           </p>
 
           <RuleGrid

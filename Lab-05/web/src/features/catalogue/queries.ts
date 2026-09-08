@@ -9,7 +9,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { repo } from "@/data/repo";
 
-export const catalogueKeys = {
+// Not exported yet: nothing outside this file invalidates the catalogue. It is
+// a factory rather than a bare string so that when something does, there is one
+// place to add to rather than a loose key to guess at.
+const catalogueKeys = {
   all: ["catalogue"] as const,
   programmes: () => [...catalogueKeys.all, "programmes"] as const,
 };

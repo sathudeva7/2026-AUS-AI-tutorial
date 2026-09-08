@@ -13,8 +13,6 @@
 import type { AvailabilityRule } from "./types";
 
 export const SLOT_MINUTES = 30;
-/** 00:00 through 23:30. Slot 48 is the exclusive end of the day, 24:00. */
-export const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES;
 
 /** Monday first, because that is how a working week reads.
  *
@@ -35,7 +33,7 @@ export const DAY_LABEL: Record<number, string> = {
   6: "Sat",
 };
 
-export function minutesOf(hhmm: string): number {
+function minutesOf(hhmm: string): number {
   const [h, m] = hhmm.split(":");
   return Number(h) * 60 + Number(m);
 }
@@ -132,7 +130,10 @@ function runToRule(day: number, first: number, last: number): AvailabilityRule {
 
 /** True when two weeks are the same week, so Save can be disabled and a
  *  no-op click does not fire a full-week write. */
-export function sameRules(a: AvailabilityRule[], b: AvailabilityRule[]): boolean {
+export function sameRules(
+  a: AvailabilityRule[],
+  b: AvailabilityRule[],
+): boolean {
   if (a.length !== b.length) return false;
   return a.every(
     (rule, i) =>

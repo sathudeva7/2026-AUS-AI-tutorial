@@ -282,4 +282,3 @@ export const INVITE_LANGUAGES = [
   "German",
   "Spanish",
 ];
-

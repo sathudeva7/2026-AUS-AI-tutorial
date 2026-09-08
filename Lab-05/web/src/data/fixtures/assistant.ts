@@ -60,11 +60,16 @@ export const SUGGESTED_ANSWERS: AssistantAnswer[] = [
     rows: [
       {
         key: "Degree length",
-        value: "3-year BSc against a 4-year minimum · transcript would settle it",
+        value:
+          "3-year BSc against a 4-year minimum · transcript would settle it",
         verdict: "indeterminate",
       },
       { key: "Grades", value: "72% against a 65% minimum", verdict: "pass" },
-      { key: "English", value: "IELTS 6.5 against a 6.5 minimum", verdict: "pass" },
+      {
+        key: "English",
+        value: "IELTS 6.5 against a 6.5 minimum",
+        verdict: "pass",
+      },
       {
         key: "Tuition against budget",
         value: "GBP 24,500 against a GBP 25,000 ceiling",
@@ -91,8 +96,7 @@ export const SUGGESTED_ANSWERS: AssistantAnswer[] = [
 export function answerFor(question: string): AssistantAnswer | null {
   const normalised = question.trim().toLowerCase();
   return (
-    SUGGESTED_ANSWERS.find(
-      (a) => a.question.toLowerCase() === normalised,
-    ) ?? null
+    SUGGESTED_ANSWERS.find((a) => a.question.toLowerCase() === normalised) ??
+    null
   );
 }

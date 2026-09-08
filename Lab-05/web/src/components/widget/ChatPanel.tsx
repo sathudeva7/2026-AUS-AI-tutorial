@@ -58,7 +58,10 @@ export function ChatPanel({
 
   return (
     <div
-      className={cn("flex flex-col overflow-hidden rounded-md shadow-lg", className)}
+      className={cn(
+        "flex flex-col overflow-hidden rounded-md shadow-lg",
+        className,
+      )}
       style={{ background: "var(--color-neutral-100)", ...style }}
     >
       <header
@@ -125,7 +128,10 @@ export function ChatPanel({
           aria-label="Message the assistant"
           disabled={running}
           className="flex-1 rounded-pill border-0 px-[14px] py-[9px] text-[13px] outline-none disabled:opacity-60"
-          style={{ background: "var(--color-neutral-200)", color: "var(--color-text)" }}
+          style={{
+            background: "var(--color-neutral-200)",
+            color: "var(--color-text)",
+          }}
         />
         <button
           type="submit"
@@ -274,7 +280,10 @@ function Item({
             ))}
           </ul>
           {item.droppedOfflist > 0 ? (
-            <div className="mt-2 text-[11px]" style={{ color: "var(--color-accent-2-700)" }}>
+            <div
+              className="mt-2 text-[11px]"
+              style={{ color: "var(--color-accent-2-700)" }}
+            >
               {item.droppedOfflist} result
               {item.droppedOfflist === 1 ? "" : "s"} dropped for being off the
               approved source list.

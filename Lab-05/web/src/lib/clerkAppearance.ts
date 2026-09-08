@@ -93,7 +93,8 @@ export const clerkAppearance: Appearance = {
     formButtonPrimary:
       "rounded-pill normal-case tracking-normal text-[14px] shadow-none",
     formFieldInput: "rounded-pill",
-    socialButtonsBlockButton: "rounded-pill border-[color:var(--color-divider)]",
+    socialButtonsBlockButton:
+      "rounded-pill border-[color:var(--color-divider)]",
     socialButtonsBlockButtonText: "text-[14px] font-body",
 
     dividerLine: "bg-[color:var(--color-divider)]",

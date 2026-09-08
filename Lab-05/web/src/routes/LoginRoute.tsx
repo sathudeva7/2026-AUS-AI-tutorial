@@ -21,11 +21,10 @@ export function LoginRoute() {
             className="mt-4 text-[14px] leading-relaxed"
             style={{ color: "var(--color-neutral-800)" }}
           >
-            Inquiries come in around the clock; counsellors answer during
-            office hours. Northbound qualifies the student, matches them
-            against your catalogue, and hands the lead over when your rules say
-            so — so your counsellors&apos; time goes to the students who are
-            ready.
+            Inquiries come in around the clock; counsellors answer during office
+            hours. Northbound qualifies the student, matches them against your
+            catalogue, and hands the lead over when your rules say so — so your
+            counsellors&apos; time goes to the students who are ready.
           </p>
         </>
       }

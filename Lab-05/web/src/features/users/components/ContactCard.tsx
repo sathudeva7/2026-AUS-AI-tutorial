@@ -135,7 +135,9 @@ function ContactForm({ user, onDone }: { user: User; onDone: () => void }) {
     // possible outcomes, because nothing on screen says the input was lost.
     const digits = national.replace(/\D/g, "");
     if (national.trim() && !digits) {
-      setErrors({ work_phone: "Enter the number in digits, for example 771234567." });
+      setErrors({
+        work_phone: "Enter the number in digits, for example 771234567.",
+      });
       return;
     }
     if (digits && !country) {
