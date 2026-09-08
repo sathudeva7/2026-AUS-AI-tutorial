@@ -120,7 +120,15 @@ export function CounsellorsRoute() {
           shrink below its content, so the cards ran off the right edge
           instead of narrowing. */}
       <div className="nb-scroll min-w-0 flex-1 overflow-y-auto px-8 pb-12 pt-7">
-        {selected ? <UserDetail user={selected} /> : null}
+        {selected ? (
+          /* key, so a different person is a different panel. The contact form
+             and the availability grid both seed useState from props, and a
+             useState initialiser runs once on mount — React would otherwise
+             keep them mounted, swap the props, and leave the boxes holding the
+             last person's half-finished edit for Save to write to whoever is
+             on screen now. */
+          <UserDetail key={selected.id} user={selected} />
+        ) : null}
       </div>
 
       <InviteDialog
