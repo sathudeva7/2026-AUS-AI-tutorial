@@ -58,7 +58,8 @@ class UserOut(BaseModel):
 
     `clerk_user_id` is deliberately absent. It is an external identifier the
     client has no use for, and shipping identifiers nobody needs is how they
-    end up in a log, a URL, or a bug report.
+    end up in a log, a URL, or a bug report. `image_url` is the one thing the
+    client actually wanted it for, resolved here instead.
     """
 
     id: str
@@ -74,6 +75,13 @@ class UserOut(BaseModel):
     invited_at: datetime | None
     accepted_at: datetime | None
     created_at: datetime
+    #: Their profile photo, hosted by Clerk. NOT a column — `db/SCHEMA.md`
+    #: keeps avatars out of this database on purpose, because a copy of
+    #: something Clerk owns is a copy that drifts. Read through per request
+    #: (cached briefly in clerk.py) and null whenever there is no photo to
+    #: show: nobody uploaded one, or they are invited and have no Clerk
+    #: account yet. The client draws initials for null.
+    image_url: str | None = None
 
 
 @router.get("/api/users")
@@ -105,17 +113,39 @@ def list_users(
     rows, total = users_repo.list_for_tenant(
         principal.tenant_id, statuses=statuses, limit=limit, offset=offset
     )
+    images = clerk.member_images(principal.tenant_id)
     return enveloped(
-        [UserOut(id=str(r["id"]), **{k: v for k, v in r.items() if k != "id"})
-         .model_dump(mode="json")
-         for r in rows],
+        [_out(r, images) for r in rows],
         meta={"limit": limit, "offset": offset, "total": total},
     )
 
 
+def _out(row: dict, images: dict[str, str]) -> dict:
+    """One roster row on the wire.
+
+    `clerk_user_id` comes out of the row here and goes no further: it is the
+    key into `images` and nothing else. Popping it rather than relying on
+    pydantic to ignore an unknown field keeps that deliberate — an `extra`
+    setting changing one day should not quietly start shipping an identifier.
+    """
+    row = dict(row)
+    clerk_user_id = row.pop("clerk_user_id", None)
+    return UserOut(
+        **{**row, "id": str(row["id"]), "image_url": images.get(clerk_user_id or "")}
+    ).model_dump(mode="json")
+
+
 def _row(tenant_id: str, user_id: str) -> dict:
-    return UserOut(**{**users_repo.get(tenant_id, user_id), "id": str(user_id)}).model_dump(
-        mode="json"
+    """One row, for every endpoint that answers with a single user.
+
+    Photos are attached here too, not only on the list. The detail panel reads
+    a person out of the cached list, so a PATCH answering without one would
+    blank their picture until the next refetch — a flicker with no cause the
+    viewer could see.
+    """
+    return _out(
+        {**users_repo.get(tenant_id, user_id), "id": str(user_id)},
+        clerk.member_images(tenant_id),
     )
 
 

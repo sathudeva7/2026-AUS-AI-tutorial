@@ -11,10 +11,14 @@ when someone joins an agency.
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 from pathlib import Path
 
 import httpx
+
+log = logging.getLogger(__name__)
 
 API = "https://api.clerk.com/v1"
 ROOT = Path(__file__).resolve().parent.parent
@@ -90,6 +94,75 @@ def post(path: str, payload: dict) -> dict:
         # invitations, and our own role check can disagree with Clerk's.
         raise ClerkError(f"clerk {r.status_code}: {r.text[:300]}")
     return r.json()
+
+
+#: Member photos, per organization: {org_id: (expires_at, {clerk_user_id: url})}.
+#:
+#: A roster read would otherwise call Clerk every time anyone opens the screen,
+#: which is a network round trip on the critical path of a page that already
+#: has its data. Sixty seconds is chosen against what it costs to be wrong: the
+#: staleness window for someone who has just changed their photo, versus a
+#: request per page view. Nothing else in the row is read from here, so a stale
+#: entry means an old picture and never an old fact.
+_IMAGE_CACHE: dict[str, tuple[float, dict[str, str]]] = {}
+_IMAGE_TTL_SECONDS = 60.0
+
+
+def member_images(org_id: str) -> dict[str, str]:
+    """Every member's profile photo, keyed by Clerk user id.
+
+    One request for the whole organization rather than one per person: a
+    forty-person agency is forty round trips the other way, on a screen that
+    already has everything else it needs.
+
+    **Only real uploads are returned.** Clerk answers with an `image_url` for
+    everybody, generating a grey placeholder for anyone who has not set one —
+    the token in that URL decodes to `{"type":"default","initials":"KS"}`.
+    Passing those through would replace our own initials avatars with Clerk's,
+    which is a worse version of what the screen already does. `has_image` is
+    the flag that separates the two, and people without a photo are simply
+    absent from this map.
+
+    Never raises. A missing photo is the same answer rendered plainer, so a
+    Clerk outage must not take the roster down with it — which is the opposite
+    of how this codebase treats a failed read everywhere else, and deliberately
+    so. An empty lead list is a false statement about the business; an avatar
+    that falls back to initials is not a statement at all.
+    """
+    now = time.monotonic()
+    cached = _IMAGE_CACHE.get(org_id)
+    if cached and cached[0] > now:
+        return cached[1]
+
+    images: dict[str, str] = {}
+    try:
+        offset, limit = 0, 100
+        while True:
+            page = get(
+                f"/organizations/{org_id}/memberships?limit={limit}&offset={offset}"
+            )
+            rows = page.get("data") or []
+            for member in rows:
+                public = member.get("public_user_data") or {}
+                user_id = public.get("user_id")
+                if user_id and public.get("has_image") and public.get("image_url"):
+                    images[user_id] = public["image_url"]
+            # Clerk returns fewer than `limit` on the last page. Guarding on
+            # the page length rather than total_count means one fewer field to
+            # be wrong about, and terminates even if Clerk stops sending it.
+            if len(rows) < limit:
+                break
+            offset += limit
+    except Exception as exc:  # noqa: BLE001 — see the docstring
+        log.warning("could not read member photos for %s: %s", org_id, exc)
+        # Cached anyway, and that is the point: a Clerk outage would otherwise
+        # mean a failed request per roster read for as long as it lasts.
+        # Sixty seconds of initials is the cheaper failure.
+        _IMAGE_CACHE[org_id] = (now + _IMAGE_TTL_SECONDS, {})
+        return {}
+
+    _IMAGE_CACHE[org_id] = (now + _IMAGE_TTL_SECONDS, images)
+    return images
 
 
 def invite_to_organization(

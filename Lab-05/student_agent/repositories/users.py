@@ -73,6 +73,12 @@ DEFAULT_STATUSES = ("active", "invited")
 _ROW = """
     select u.id, u.name, u.email, u.role, u.status, u.timezone, u.work_phone,
            u.invited_at, u.accepted_at, u.created_at,
+           -- INTERNAL ONLY. The join key to Clerk, where profile photos live;
+           -- api/users.py swaps it for an image url and drops it before the
+           -- row reaches the wire. UserOut says why it must not be shipped.
+           -- Selectable beside `group by u.id` because id is the primary key,
+           -- so every other u.* column is functionally dependent on it.
+           u.clerk_user_id,
            coalesce(
                array_agg(c.country order by c.country)
                    filter (where c.country is not null),
