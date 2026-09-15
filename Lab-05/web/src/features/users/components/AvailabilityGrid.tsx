@@ -12,14 +12,19 @@
  * 09:00 has set 09:00 in London.
  *
  * Booked meetings will appear here as a second kind of block. They have no
- * table yet (003's header: "slots come in 004"), so the legend says so rather
- * than the screen pretending they do not exist.
+ * table yet (003's header: "slots come in 004"), so the note under the legend
+ * says so rather than the screen pretending they do not exist.
+ *
+ * The legend's third entry, "Selected", is hours painted in this sitting and
+ * not yet written. It earns a colour of its own: the difference between hours
+ * a student can already book and hours that disappear if you close the tab is
+ * the one thing this grid cannot afford to leave ambiguous.
  */
 import { useState } from "react";
 
 import { FieldValidationError } from "@/api/errors";
-import { useSession } from "@/data/SessionProvider";
 
+import { useMayEditUser } from "../access";
 import {
   COLUMN_DAYS,
   DAY_LABEL,
@@ -28,29 +33,31 @@ import {
   cellKey,
   cellsToRules,
   formatMinutes,
+  formatWeeklyHours,
   mondayOf,
   offGridRules,
   rulesToCells,
   sameRules,
-  totalHours,
   visibleSlotRange,
 } from "../availability";
 import { useSetUserAvailability, useUserAvailability } from "../queries";
 import type { AvailabilityRule, User } from "../types";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 
 export function AvailabilityGrid({ user }: { user: User }) {
-  const { session, can } = useSession();
   const { data: saved, isPending, error } = useUserAvailability(user.id);
-
-  // Self, or users.edit — the rule the endpoint enforces. Someone who cannot
-  // set their own hours has them decided by a colleague in another timezone.
-  const mayEdit = can("users.edit") || session?.user_id === user.id;
+  const mayEdit = useMayEditUser(user);
 
   if (isPending) {
     return (
       <section className="console-card mt-4">
         <div className="console-card-head">
-          <h3 className="console-section-title">Availability</h3>
+          <h3 className="console-section-title">
+            <span className="inline-flex items-center gap-2">
+              <CalendarIcon size={17} />
+              Availability
+            </span>
+          </h3>
         </div>
         <div className="console-card-body">
           <p className="console-meta m-0">Reading the week…</p>
@@ -63,7 +70,12 @@ export function AvailabilityGrid({ user }: { user: User }) {
     return (
       <section className="console-card mt-4">
         <div className="console-card-head">
-          <h3 className="console-section-title">Availability</h3>
+          <h3 className="console-section-title">
+            <span className="inline-flex items-center gap-2">
+              <CalendarIcon size={17} />
+              Availability
+            </span>
+          </h3>
         </div>
         <div className="console-card-body">
           <p className="console-error m-0" role="alert">
@@ -103,6 +115,9 @@ function Grid({
   const draft = cellsToRules(cells);
   const offGrid = offGridRules(saved);
   const [fromSlot, toSlot] = visibleSlotRange(cells);
+  // What is actually stored, so the grid can tell an hour a student can book
+  // today from one that only exists in this tab.
+  const savedCells = rulesToCells(saved);
 
   // The saved week put through the same round trip the draft went through.
   //
@@ -139,37 +154,47 @@ function Grid({
     }
   }
 
-  const hours = totalHours(cells);
+  const hours = formatWeeklyHours(cells);
 
   return (
     <section className="console-card mt-4">
       <div className="console-card-head">
-        <h3 className="console-section-title">Availability</h3>
+        <h3 className="console-section-title">
+          <span className="inline-flex items-center gap-2">
+            <CalendarIcon size={17} />
+            Availability
+          </span>
+        </h3>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="console-btn"
+            className="console-icon-btn"
             data-variant="secondary"
             aria-label="Previous week"
             onClick={() => setWeekStart(addDays(weekStart, -7))}
           >
-            ‹
+            <ChevronLeftIcon size={16} />
           </button>
+          {/* The year is spelled out. These columns are orientation for a
+              pattern with no dates in it, and paging far enough to leave the
+              current year without the heading saying so is disorienting in a
+              way a bare "Week of 7 September" cannot fix. */}
           <span className="console-meta">
             Week of{" "}
             {weekStart.toLocaleDateString(undefined, {
               day: "numeric",
               month: "long",
+              year: "numeric",
             })}
           </span>
           <button
             type="button"
-            className="console-btn"
+            className="console-icon-btn"
             data-variant="secondary"
             aria-label="Next week"
             onClick={() => setWeekStart(addDays(weekStart, 7))}
           >
-            ›
+            <ChevronRightIcon size={16} />
           </button>
         </div>
       </div>
@@ -219,6 +244,7 @@ function Grid({
                   slot={slot}
                   onHour={onHour}
                   cells={cells}
+                  savedCells={savedCells}
                   mayEdit={mayEdit}
                   painting={painting}
                   onPaintStart={(day, on) => {
@@ -240,10 +266,22 @@ function Grid({
             Available
           </span>
           <span className="console-legend-item">
-            <span className="console-swatch" data-kind="booked" />
-            Booked — appears here once meetings are live
+            <span className="console-swatch" data-kind="unavailable" />
+            Unavailable
           </span>
+          <span className="console-legend-item">
+            <span className="console-swatch" data-kind="selected" />
+            Selected — not saved yet
+          </span>
+          {/* Right-aligned, away from the legend it is not part of. */}
+          <span className="console-weekhours ml-auto">Weekly hours: {hours}</span>
         </div>
+
+        {/* Booked meetings have no table yet ("slots come in 004"). Saying so
+            is better than a legend entry for a block that can never appear. */}
+        <p className="console-hint">
+          Booked consultations will appear on this grid once meetings exist.
+        </p>
 
         {offGrid.length ? (
           <p className="console-hint mt-3">
@@ -290,17 +328,17 @@ function Grid({
             >
               Discard
             </button>
-            <span className="console-meta ml-1">
-              {hours === 0
-                ? "Nothing selected"
-                : `${hours} hour${hours === 1 ? "" : "s"} a week`}
-            </span>
+            {dirty ? (
+              <span className="console-meta ml-1">
+                Unsaved changes to this week.
+              </span>
+            ) : null}
           </div>
         ) : (
           <p className="console-meta mt-3">
-            {hours === 0
+            {cells.size === 0
               ? "No hours set."
-              : `${hours} hours a week. Only they or a manager can change this.`}
+              : "Only they or a manager can change this."}
           </p>
         )}
       </div>
@@ -312,6 +350,7 @@ function Row({
   slot,
   onHour,
   cells,
+  savedCells,
   mayEdit,
   painting,
   onPaintStart,
@@ -320,6 +359,7 @@ function Row({
   slot: number;
   onHour: boolean;
   cells: Set<string>;
+  savedCells: Set<string>;
   mayEdit: boolean;
   painting: null | boolean;
   onPaintStart: (day: number, on: boolean) => void;
@@ -334,7 +374,13 @@ function Row({
         {onHour ? formatMinutes(slot * SLOT_MINUTES) : ""}
       </div>
       {COLUMN_DAYS.map((day) => {
-        const on = cells.has(cellKey(day, slot));
+        const key = cellKey(day, slot);
+        const on = cells.has(key);
+        // Painted in this sitting and not yet written. Drawn differently, and
+        // deliberately NOT said in the aria-label: to anyone reading the grid
+        // a cell is available or it is not, and "available, unsaved" on forty
+        // cells is noise around a Save button that already says so.
+        const pending = on && !savedCells.has(key);
         const label = `${DAY_LABEL[day]} ${formatMinutes(slot * SLOT_MINUTES)}`;
         return (
           <button
@@ -342,6 +388,7 @@ function Row({
             type="button"
             className="console-cell"
             data-on={on ? "true" : undefined}
+            data-pending={pending ? "true" : undefined}
             data-hour={onHour ? "true" : undefined}
             disabled={!mayEdit}
             // Space and Enter reach this through click, so the grid works
@@ -358,7 +405,9 @@ function Row({
               // the work, so only act on keyboard-generated clicks.
               if (e.detail === 0) onPaintStart(day, !on);
             }}
-          />
+          >
+            <span className="console-cell-fill" aria-hidden="true" />
+          </button>
         );
       })}
     </>

@@ -5,7 +5,13 @@
  * test, a component that has good reason not to use a hook.
  */
 import { get, getWithMeta, patch, post, postWithMeta, put } from "@/api/client";
-import type { AvailabilityRule, Role, User, UserListResult } from "./types";
+import type {
+  AvailabilityRule,
+  Role,
+  User,
+  UserListParams,
+  UserListResult,
+} from "./types";
 
 /** `GET /api/users` — the roster. Readable by any member: routing is by owned
  *  country, so a counsellor who cannot see who owns Australia cannot hand a
@@ -14,11 +20,7 @@ import type { AvailabilityRule, Role, User, UserListResult } from "./types";
  *  `limit` is bounded at 100 by the backend and REFUSED above that rather than
  *  clamped, so asking for 5000 is an error rather than a wrong answer. */
 export async function listUsers(
-  params: {
-    status?: "active" | "invited" | "deactivated" | "all";
-    limit?: number;
-    offset?: number;
-  } = {},
+  params: UserListParams = {},
 ): Promise<UserListResult> {
   const query = new URLSearchParams();
   if (params.status) query.set("status", params.status);

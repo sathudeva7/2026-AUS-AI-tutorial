@@ -7,29 +7,45 @@
  *
  * Hours are deliberately not read here. They belong to whoever is selected,
  * not to a list nobody has clicked yet.
+ *
+ * The search box, the chips and the sort live on the route above; this reads
+ * them as props and narrows the same cached list. It still calls `useUsers`
+ * itself rather than taking rows as a prop, so the loading and failure states
+ * stay where the list is — and because the route asks with the same params,
+ * both hooks land on one cache entry and one request.
  */
 import { FailureCard } from "@/components/ui/States";
 
 import { useUsers } from "../queries";
+import { Avatar } from "./Avatar";
+import { coverage, displayName, STATUS_LABEL } from "../display";
 import {
-  coverage,
-  displayInitials,
-  displayName,
-  STATUS_LABEL,
-} from "../display";
-import type { User } from "../types";
+  filterUsers,
+  searchUsers,
+  sortUsers,
+  type RosterFilter,
+  type RosterSort,
+} from "../roster";
+import type { User, UserListParams } from "../types";
 
 export function RosterList({
+  params,
+  query,
+  filter,
+  sort,
   selectedId,
   onSelect,
 }: {
+  /** The same object the route passes to its own `useUsers`. Both must match
+   *  or the screen fires two requests for two versions of the roster. */
+  params: UserListParams;
+  query: string;
+  filter: RosterFilter;
+  sort: RosterSort;
   selectedId?: string;
   onSelect: (userId: string) => void;
 }) {
-  // No status filter: the backend defaults to active plus invited. Deactivated
-  // people are history, and an owner who invited someone yesterday needs to
-  // see that it happened.
-  const { data, isPending, error } = useUsers();
+  const { data, isPending, error } = useUsers(params);
 
   if (isPending) {
     return <p className="console-meta px-1 py-2">Reading the roster…</p>;
@@ -45,36 +61,51 @@ export function RosterList({
     );
   }
 
-  const { users, total } = data;
-  const active = users.filter((u) => u.status === "active").length;
+  // Search last, so the chip a person clicked decides the population and the
+  // box only narrows within it.
+  const shown = sortUsers(
+    searchUsers(filterUsers(data.users, filter), query),
+    sort,
+  );
+
+  if (data.users.length === 0) {
+    return (
+      <p className="console-empty m-0">
+        Nobody on the roster yet. Invite a colleague to get started.
+      </p>
+    );
+  }
+
+  // Three different nothings, and they need three different sentences. "No
+  // results" after a search is a typo; after a chip it is a fact about the
+  // agency worth reading.
+  if (shown.length === 0) {
+    return (
+      <p className="console-empty m-0">
+        {query.trim()
+          ? `Nobody matches “${query.trim()}”.`
+          : filter === "unassigned"
+            ? "Everybody owns at least one country."
+            : "Nobody on the roster is active."}
+      </p>
+    );
+  }
 
   return (
-    <>
-      <p className="console-meta m-0 mb-3">
-        {active} active of {total}
-      </p>
-
-      {users.length === 0 ? (
-        <p className="console-empty m-0">
-          Nobody on the roster yet. Invite a colleague to get started.
-        </p>
-      ) : (
-        <ul
-          className="m-0 flex list-none flex-col gap-0.5 p-0"
-          aria-label="Counsellors"
-        >
-          {users.map((user) => (
-            <li key={user.id}>
-              <RosterRow
-                user={user}
-                selected={user.id === selectedId}
-                onSelect={onSelect}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+    <ul
+      className="m-0 flex list-none flex-col gap-1 p-0"
+      aria-label="Counsellors"
+    >
+      {shown.map((user) => (
+        <li key={user.id}>
+          <RosterRow
+            user={user}
+            selected={user.id === selectedId}
+            onSelect={onSelect}
+          />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -100,10 +131,8 @@ function RosterRow({
       // colour off a dot.
       aria-label={`${name}, ${STATUS_LABEL[user.status]}`}
     >
-      <span className="flex items-center gap-2.5">
-        <span className="console-avatar" aria-hidden="true">
-          {displayInitials(user)}
-        </span>
+      <span className="flex items-center gap-3">
+        <Avatar user={user} />
         <span className="min-w-0 flex-1">
           <span className="console-row-name truncate">{name}</span>
           {/* Role and coverage separated by space, not a dot or a dash. Both

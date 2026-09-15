@@ -5,19 +5,44 @@
  * requirement comes from here, which is why every row travels with the date
  * it was last verified and why a stale row says so in words rather than only
  * in colour.
+ *
+ * Fixture-backed, and that is not hidden. There is no `GET /api/programmes`
+ * and no PUT behind it: `catalogueStore` is a session overlay, so an edit
+ * survives navigation and not a reload. Every destructive control here says
+ * so at the point of use rather than letting the table imply a catalogue the
+ * agent reads has changed.
  */
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+
+import { Button, Card, StatusChip } from "@/components/ui";
+import { Dialog } from "@/components/ui/Dialog";
+import { Menu } from "@/components/ui/Menu";
+import { Select } from "@/components/ui/Select";
 import {
-  Button,
-  Card,
-  ReadonlyValue,
-  StatusChip,
-  Table,
-} from "@/components/ui";
-import { Tabs, TabPanel } from "@/components/ui/Tabs";
-import { decideRefreshItem, useCatalogue } from "@/data/catalogueStore";
-import { formatDate, formatMoney, isStale, verifiedLabel } from "@/lib/format";
+  ClockIcon,
+  CloseIcon,
+  GlobeIcon,
+  GraduationIcon,
+  InstitutionIcon,
+  PlusIcon,
+  SearchIcon,
+  SlidersIcon,
+} from "@/components/ui/icons";
+import {
+  decideRefreshItem,
+  deleteProgramme,
+  duplicateProgramme,
+  useCatalogue,
+} from "@/data/catalogueStore";
+import { COUNTRY_BY_CODE, toCountryCode } from "@/data/countries";
+import { formatDate, formatMoney, verifiedLabel } from "@/lib/format";
+import {
+  levelLabel,
+  orgInitials,
+  statusOf,
+  STATUS_LABEL,
+} from "@/features/catalogue/display";
 import type { Programme, RefreshItem } from "@/data/types";
 
 type TabValue = "programmes" | "rules" | "freshness";
@@ -28,6 +53,8 @@ const TABS = [
   { value: "freshness" as const, label: "Freshness" },
 ];
 
+const ROWS_PER_PAGE = [10, 25, 50];
+
 export function CatalogueRoute() {
   const [params, setParams] = useSearchParams();
   const tab = (params.get("tab") as TabValue) ?? "programmes";
@@ -36,123 +63,449 @@ export function CatalogueRoute() {
 
   const institutions = new Set(programmes.map((p) => p.institution)).size;
   const countries = new Set(programmes.map((p) => p.country)).size;
+  const needsCheck = programmes.filter((p) => statusOf(p) !== "active").length;
 
   return (
-    <div className="px-8 pb-12 pt-[34px]">
+    <div className="console console-sheet-page">
+      <nav className="console-crumbs" aria-label="Breadcrumb">
+        <span>Catalogue</span>
+        <span className="console-crumbs-sep" aria-hidden="true">
+          ›
+        </span>
+        <span style={{ color: "var(--c-ink)" }}>
+          {TABS.find((t) => t.value === tab)?.label}
+        </span>
+      </nav>
+
       <div className="flex items-start gap-4">
-        <div>
-          <h2 className="m-0 text-[32px]">Catalogue</h2>
-          <p
-            className="mt-1.5 max-w-[68ch] text-sm"
-            style={{ color: "var(--color-neutral-700)" }}
-          >
-            {programmes.length} programmes across {institutions} institutions in{" "}
-            {countries} countries. Every figure the agent states comes from a
-            row here, and travels with the date it was last checked.
+        <div className="min-w-0">
+          <h2 className="console-page-title">Programme catalogue</h2>
+          <p className="console-page-sub">
+            Every figure the agent states about a fee, a deadline or an entry
+            requirement comes from a row here, and travels with the date it was
+            last verified.
           </p>
         </div>
-        <Button
-          variant="primary"
-          className="ml-auto"
+        <button
+          type="button"
+          className="console-btn ml-auto flex-none"
+          data-variant="primary"
           onClick={() => navigate("/catalogue/new")}
         >
-          Add a programme
-        </Button>
+          <PlusIcon size={15} />
+          Add programme
+        </button>
       </div>
 
-      <Tabs
-        items={TABS}
-        value={tab}
-        onChange={(next) => setParams({ tab: next })}
-        label="Catalogue sections"
-        className="my-5"
-      />
+      {/* Four counts, all of them read off the rows in the table below.
+          "Needs verification" is the only one anybody acts on, which is why it
+          is the only one wearing red. */}
+      <div className="console-tiles">
+        <Tile
+          tone="accent"
+          icon={<GraduationIcon size={20} />}
+          value={programmes.length}
+          label="Total programmes"
+        />
+        <Tile
+          tone="info"
+          icon={<InstitutionIcon size={20} />}
+          value={institutions}
+          label={institutions === 1 ? "Institution" : "Institutions"}
+        />
+        <Tile
+          tone="warn"
+          icon={<GlobeIcon size={20} />}
+          value={countries}
+          label={countries === 1 ? "Country" : "Countries"}
+        />
+        <Tile
+          tone="danger"
+          icon={<ClockIcon size={20} />}
+          value={needsCheck}
+          label="Needs verification"
+        />
+      </div>
 
-      <TabPanel value={tab}>
-        {tab === "programmes" ? (
-          <ProgrammesTable
-            programmes={programmes}
-            onOpen={(id) => navigate(`/catalogue/${id}`)}
-          />
-        ) : null}
-        {tab === "rules" ? <RulesTab programmes={programmes} /> : null}
-        {tab === "freshness" ? <FreshnessTab items={refreshItems} /> : null}
-      </TabPanel>
+      <div className="console-tabs" role="tablist" aria-label="Catalogue sections">
+        {TABS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            role="tab"
+            className="console-tab"
+            aria-selected={t.value === tab}
+            onClick={() => setParams({ tab: t.value })}
+          >
+            {t.label}
+            {t.value === "programmes" ? ` (${programmes.length})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {tab === "programmes" ? (
+        <ProgrammesTab
+          programmes={programmes}
+          onOpen={(id) => navigate(`/catalogue/${id}`)}
+        />
+      ) : null}
+      {tab === "rules" ? <RulesTab programmes={programmes} /> : null}
+      {tab === "freshness" ? <FreshnessTab items={refreshItems} /> : null}
     </div>
   );
 }
 
-function ProgrammesTable({
+function Tile({
+  tone,
+  icon,
+  value,
+  label,
+}: {
+  tone: "accent" | "info" | "warn" | "danger";
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+}) {
+  return (
+    <div className="console-tile" data-tone={tone}>
+      <span className="console-tile-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <div>
+        <div className="console-tile-value">{value}</div>
+        <div className="console-tile-label">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function ProgrammesTab({
   programmes,
   onOpen,
 }: {
   programmes: Programme[];
   onOpen: (programmeId: string) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [country, setCountry] = useState("");
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(10);
+  const [confirmDelete, setConfirmDelete] = useState<Programme | null>(null);
+
+  const countryOptions = [
+    { value: "", label: "All countries" },
+    ...[...new Set(programmes.map((p) => p.country))]
+      .sort()
+      .map((c) => ({ value: c, label: c })),
+  ];
+
+  const needle = query.trim().toLowerCase();
+  const shown = programmes.filter((p) => {
+    if (country && p.country !== country) return false;
+    if (status && statusOf(p) !== status) return false;
+    if (!needle) return true;
+    return [p.name, p.institution, p.country, p.city, p.field, p.level].some(
+      (f) => f.toLowerCase().includes(needle),
+    );
+  });
+
+  // Clamped rather than reset. Filtering down to three rows while on page 4
+  // would otherwise show an empty table with no way to tell why.
+  const pages = Math.max(1, Math.ceil(shown.length / perPage));
+  const current = Math.min(page, pages - 1);
+  const from = current * perPage;
+  const rows = shown.slice(from, from + perPage);
+
   return (
-    <Card className="max-w-[1080px] overflow-hidden rounded-md p-0">
-      <Table
-        head={[
-          "Programme",
-          "Institution",
-          "Tuition",
-          "Deadline",
-          "Last verified",
-        ]}
-      >
-        {programmes.map((programme) => {
-          const stale = isStale(programme.verified_at);
-          return (
-            <tr
-              key={programme.programme_id}
-              className="cursor-pointer"
-              onClick={() => onOpen(programme.programme_id)}
-            >
-              <td className="font-semibold">
-                <button
-                  type="button"
-                  className="text-left"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpen(programme.programme_id);
-                  }}
-                >
-                  {programme.name}
-                </button>
-              </td>
-              <td>{programme.institution}</td>
-              <td className="figure text-[12.5px]">
-                {formatMoney(programme.tuition_per_year, programme.currency)}
-              </td>
-              <td>{formatDate(programme.application_deadline)}</td>
-              <td>
-                <StatusChip
-                  label={
-                    programme.draft
-                      ? "Draft · not visible"
-                      : verifiedLabel(programme.verified_at)
-                  }
-                  background={
-                    programme.draft
-                      ? "var(--color-neutral-300)"
-                      : stale
-                        ? "var(--color-accent-200)"
-                        : "var(--color-accent-2-200)"
-                  }
-                  foreground={
-                    programme.draft
-                      ? "var(--color-neutral-900)"
-                      : stale
-                        ? "var(--color-accent-800)"
-                        : "var(--color-accent-2-800)"
-                  }
-                />
-              </td>
+    <>
+      <div className="console-toolbar">
+        <div className="console-search" style={{ maxWidth: 320 }}>
+          <SearchIcon size={15} className="console-search-icon" />
+          <input
+            className="console-input"
+            type="search"
+            value={query}
+            placeholder="Search programmes, institutions…"
+            aria-label="Search programmes"
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+
+        <Select
+          className="w-[190px]"
+          value={country}
+          options={countryOptions}
+          ariaLabel="Filter by country"
+          onChange={(v) => {
+            setCountry(v);
+            setPage(0);
+          }}
+        />
+
+        <Select
+          className="w-[180px]"
+          value={status}
+          searchable={false}
+          ariaLabel="Filter by status"
+          options={[
+            { value: "", label: "All statuses" },
+            { value: "active", label: "Active" },
+            { value: "stale", label: "Needs check" },
+            { value: "draft", label: "Draft" },
+          ]}
+          onChange={(v) => {
+            setStatus(v);
+            setPage(0);
+          }}
+        />
+
+        {query || country || status ? (
+          <button
+            type="button"
+            className="console-btn"
+            data-variant="secondary"
+            onClick={() => {
+              setQuery("");
+              setCountry("");
+              setStatus("");
+              setPage(0);
+            }}
+          >
+            <SlidersIcon size={15} />
+            Clear filters
+          </button>
+        ) : null}
+
+        <span className="console-meta ml-auto">
+          {shown.length === programmes.length
+            ? `${programmes.length} programmes`
+            : `${shown.length} of ${programmes.length} programmes`}
+        </span>
+      </div>
+
+      <div className="console-table-wrap">
+        <table className="console-table">
+          <thead>
+            <tr>
+              <th scope="col">Programme</th>
+              <th scope="col">Institution</th>
+              <th scope="col">Country</th>
+              <th scope="col">Tuition</th>
+              <th scope="col">Application deadline</th>
+              <th scope="col">Last verified</th>
+              <th scope="col">Status</th>
+              <th scope="col">Actions</th>
             </tr>
-          );
-        })}
-      </Table>
-    </Card>
+          </thead>
+          <tbody>
+            {rows.map((programme) => {
+              const rowStatus = statusOf(programme);
+              const code = toCountryCode(programme.country);
+              return (
+                <tr
+                  key={programme.programme_id}
+                  data-clickable="true"
+                  onClick={() => onOpen(programme.programme_id)}
+                >
+                  <td>
+                    <div className="console-cell-title">{programme.name}</div>
+                    <div className="console-cell-sub">
+                      {levelLabel(programme.level)}
+                    </div>
+                  </td>
+                  <td>
+                    <span className="flex items-center gap-2.5">
+                      <span className="console-org" aria-hidden="true">
+                        {orgInitials(programme.institution)}
+                      </span>
+                      <span className="min-w-0">{programme.institution}</span>
+                    </span>
+                  </td>
+                  <td>
+                    <span className="flex items-center gap-2">
+                      <span className="console-flag" aria-hidden="true">
+                        {COUNTRY_BY_CODE[code]?.flag ?? "🏳"}
+                      </span>
+                      {programme.country}
+                    </span>
+                  </td>
+                  <td>
+                    {formatMoney(
+                      programme.tuition_per_year,
+                      programme.currency,
+                    )}
+                  </td>
+                  <td>{formatDate(programme.application_deadline)}</td>
+                  {/* The date in words, not a bare timestamp: "5 weeks ago" is
+                      the thing somebody acts on. */}
+                  <td className="console-meta">
+                    {programme.draft
+                      ? "Never"
+                      : verifiedLabel(programme.verified_at)}
+                  </td>
+                  <td>
+                    <span
+                      className="console-lead-status"
+                      data-status={
+                        rowStatus === "active" ? "converted" : "escalated"
+                      }
+                    >
+                      {STATUS_LABEL[rowStatus]}
+                    </span>
+                  </td>
+                  <td
+                    style={{ width: 48 }}
+                    // The row navigates; the menu must not.
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Menu
+                      label={`Actions for ${programme.name}`}
+                      trigger={<span aria-hidden="true">···</span>}
+                      items={[
+                        {
+                          label: "Edit",
+                          onSelect: () => onOpen(programme.programme_id),
+                        },
+                        {
+                          label: "Duplicate",
+                          onSelect: () => {
+                            const copy = duplicateProgramme(
+                              programme.programme_id,
+                            );
+                            if (copy) onOpen(copy.programme_id);
+                          },
+                        },
+                        {
+                          label: "Delete",
+                          danger: true,
+                          onSelect: () => setConfirmDelete(programme),
+                        },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={8}>
+                  <p className="console-empty m-0 py-6 text-center">
+                    {programmes.length === 0
+                      ? "No programmes yet. Add one to get started."
+                      : "No programmes match these filters."}
+                  </p>
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="console-pager">
+        <span className="console-meta">
+          {shown.length === 0
+            ? "Nothing to show"
+            : `Showing ${from + 1}–${Math.min(from + perPage, shown.length)} of ${shown.length} programmes`}
+        </span>
+
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            className="console-page-btn"
+            aria-label="Previous page"
+            disabled={current === 0}
+            onClick={() => setPage(current - 1)}
+          >
+            ‹
+          </button>
+          {Array.from({ length: pages }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              className="console-page-btn"
+              aria-label={`Page ${i + 1}`}
+              aria-current={i === current ? "true" : undefined}
+              onClick={() => setPage(i)}
+            >
+              {i + 1}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="console-page-btn"
+            aria-label="Next page"
+            disabled={current >= pages - 1}
+            onClick={() => setPage(current + 1)}
+          >
+            ›
+          </button>
+        </div>
+
+        <Select
+          className="w-[116px]"
+          value={String(perPage)}
+          searchable={false}
+          ariaLabel="Rows per page"
+          options={ROWS_PER_PAGE.map((n) => ({
+            value: String(n),
+            label: `${n} rows`,
+          }))}
+          onChange={(v) => {
+            setPerPage(Number(v));
+            setPage(0);
+          }}
+        />
+      </div>
+
+      <Dialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        title="Delete this programme?"
+        description={
+          confirmDelete
+            ? `${confirmDelete.name} — ${confirmDelete.institution}. The agent will stop matching students against it.`
+            : undefined
+        }
+        footer={
+          <>
+            <button
+              type="button"
+              className="console-btn"
+              data-variant="secondary"
+              onClick={() => setConfirmDelete(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="console-btn"
+              data-variant="primary"
+              style={{ background: "var(--c-danger)" }}
+              onClick={() => {
+                if (confirmDelete) deleteProgramme(confirmDelete.programme_id);
+                setConfirmDelete(null);
+              }}
+            >
+              Delete
+            </button>
+          </>
+        }
+      >
+        {/* Said plainly, because the opposite assumption is the dangerous one.
+            Somebody who believes this wrote to a shared catalogue will not
+            check afterwards. */}
+        <p className="console-hint m-0">
+          This catalogue is demo data held for the current session only — there
+          is no programmes endpoint behind it yet. The row disappears from this
+          table and comes back when the page reloads.
+        </p>
+      </Dialog>
+    </>
   );
 }
 
@@ -226,7 +579,11 @@ function RulesTab({ programmes }: { programmes: Programme[] }) {
   );
 }
 
-/** The five-column rule grid, shared with the editor. */
+/** The rule grid, shared with the editor.
+ *
+ * Both call sites now sit inside `.console`, so it is drawn in the console's
+ * type rather than Organic's.
+ */
 export function RuleGrid({
   requirements,
   onRemove,
@@ -235,52 +592,58 @@ export function RuleGrid({
   onRemove?: (index: number) => void;
 }) {
   return (
-    <div className="flex flex-col gap-[9px]">
+    <div className="console-rules">
       {requirements.map((requirement, index) => (
         <div
           key={requirement.requirement_id || index}
-          className="grid items-center gap-[9px]"
+          className="console-rule"
           style={{
-            // The prototype's middle column was 96px, sized for words like
-            // "at least". Real rules are expressions — `bachelor_years>=4`,
-            // `percentage>=65` — and clipped to `bachelor_years>` at that
-            // width, which turns a rule into a different rule. 190px fits the
-            // longest in the seed catalogue with room to spare.
-            gridTemplateColumns: `180px 190px 1fr ${onRemove ? "36px" : "0px"}`,
+            // The rule column is sized to its CONTENT, not to a number.
+            //
+            // It was 96px in the prototype, then 190px here — both guesses at
+            // how long an expression gets, and both wrong for
+            // `tuition_per_year<=budget_per_year`. Truncating is not the
+            // answer either: a rule clipped to `bachelor_years>` is a
+            // different rule, and this column is the one place on the screen
+            // where the exact characters are the point.
+            //
+            // max-content measures the widest rule across every row, so the
+            // column fits the longest one and the description takes what is
+            // left. Nothing to re-tune when a longer rule is added.
+            gridTemplateColumns: `180px max-content minmax(0, 1fr) ${
+              onRemove ? "34px" : "0px"
+            }`,
           }}
         >
-          <ReadonlyValue>{requirement.key.replace(/_/g, " ")}</ReadonlyValue>
-          <ReadonlyValue
-            className="figure text-center"
-            title={requirement.rule}
-          >
+          <span className="console-rule-key">
+            {requirement.key.replace(/_/g, " ")}
+          </span>
+          <span className="console-rule-expr" title={requirement.rule}>
             {requirement.rule}
-          </ReadonlyValue>
-          <ReadonlyValue muted>{requirement.description}</ReadonlyValue>
+          </span>
+          <span className="console-rule-note">{requirement.description}</span>
           {onRemove ? (
-            <Button
-              variant="ghost"
-              aria-label={`Remove ${requirement.key} requirement`}
+            <button
+              type="button"
+              className="console-icon-btn"
+              data-variant="ghost"
+              aria-label={`Remove ${requirement.key.replace(/_/g, " ")} requirement`}
               onClick={() => onRemove(index)}
-              style={{ color: "var(--color-neutral-700)" }}
             >
-              ×
-            </Button>
+              <CloseIcon size={15} />
+            </button>
           ) : (
             <span />
           )}
         </div>
       ))}
       {requirements.length === 0 ? (
-        <div
-          className="rounded-md p-4 text-[12.5px]"
-          style={{
-            border: "1px dashed var(--color-neutral-400)",
-            color: "var(--color-neutral-700)",
-          }}
-        >
-          No requirements yet. A programme with none matches every student,
-          which is rarely what you mean.
+        <div className="console-emptybox">
+          <div className="console-emptybox-title">No entry requirements</div>
+          <p className="console-emptybox-body">
+            A programme with none matches every student who reaches the
+            catalogue, which is rarely what you mean.
+          </p>
         </div>
       ) : null}
     </div>

@@ -1,4 +1,4 @@
-/** The console frame: a fixed rail and a scrolling main pane.
+/** The console frame: a fixed sidebar, a top bar, and a scrolling main pane.
  *
  * Desktop-first, exactly as the reference is — `main` holds a 1180px floor
  * and the whole shell scrolls horizontally below that. These are dense
@@ -7,7 +7,14 @@
  * product, not a narrower one.
  *
  * The student widget is the exception. It is an embeddable panel a real
- * student opens on a real phone, so its route opts out of the floor.
+ * student opens on a real phone, so its route opts out of the floor AND out
+ * of the chrome: a student on an agency's website must never see the agency's
+ * own navigation.
+ *
+ * The rail lists the six surfaces that exist. The reference design shows ten
+ * — Students, Applications, Universities, Countries, Tasks, Calendar, Reports
+ * — and seven of those have no route behind them. Shipping them would be
+ * seven links that navigate nowhere, which is worse than a shorter rail.
  */
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -17,33 +24,34 @@ import {
   UserButton,
   useOrganization,
 } from "@clerk/react";
+import type { ReactNode } from "react";
+
+import {
+  ChatIcon,
+  GraduationIcon,
+  GridIcon,
+  InstitutionIcon,
+  PeopleIcon,
+  SettingsIcon,
+  SparkIcon,
+} from "@/components/ui/icons";
 import { repo } from "@/data/repo";
+
+import { GlobalSearch } from "./GlobalSearch";
 
 interface RailEntry {
   to: string;
   title: string;
-  sub: string;
+  icon: ReactNode;
 }
 
 const RAIL: RailEntry[] = [
-  { to: "/widget", title: "Student widget", sub: "Intake, shortlist, booking" },
-  {
-    to: "/leads",
-    title: "Counsellor dashboard",
-    sub: "Leads, profile, briefing",
-  },
-  {
-    to: "/assistant",
-    title: "Counsellor assistant",
-    sub: "Ask across your leads",
-  },
-  { to: "/counsellors", title: "Counsellors", sub: "Roster, coverage, load" },
-  {
-    to: "/catalogue",
-    title: "Catalogue console",
-    sub: "Programmes, rules, freshness",
-  },
-  { to: "/setup", title: "Tenant setup", sub: "Keys, widget, embed" },
+  { to: "/leads", title: "Dashboard", icon: <GridIcon size={18} /> },
+  { to: "/counsellors", title: "Counsellors", icon: <PeopleIcon size={18} /> },
+  { to: "/widget", title: "Student widget", icon: <ChatIcon size={18} /> },
+  { to: "/assistant", title: "Assistant", icon: <SparkIcon size={18} /> },
+  { to: "/catalogue", title: "Catalogue", icon: <InstitutionIcon size={18} /> },
+  { to: "/setup", title: "Settings", icon: <SettingsIcon size={18} /> },
 ];
 
 export function AppShell() {
@@ -53,74 +61,100 @@ export function AppShell() {
   const isWidget = location.pathname.startsWith("/widget");
 
   return (
+    // `console-shell` carries the tokens and the ground but NOT the console's
+    // typography. It wraps every route, including the ones still drawn in
+    // Organic, and a font-family here would restyle all of them as a side
+    // effect of adding a sidebar. The chrome opts into the type by carrying
+    // `console` itself.
     <div
-      className="flex h-screen overflow-y-hidden"
-      style={{
-        background: "var(--color-bg)",
-        overflowX: isWidget ? "hidden" : "auto",
-      }}
+      className="console-shell"
+      style={{ overflowX: isWidget ? "hidden" : "auto" }}
     >
-      <aside
-        className="flex w-[252px] min-w-[252px] flex-none flex-col gap-[22px] px-[18px] py-6"
-        style={{
-          borderRight: "1px solid var(--color-divider)",
-          background: "var(--color-neutral-100)",
-        }}
-      >
+      <aside className="console console-rail-nav">
         <Brand />
-        <nav
-          className="flex flex-col gap-[5px]"
-          aria-label="Northbound surfaces"
-        >
+
+        <nav className="console-nav" aria-label="Northbound surfaces">
           {RAIL.map((entry) => (
             // NavLink marks the active route with aria-current="page", which
             // is the correct value for a link (the prototype's rail was
-            // buttons, where "true" was right). app.css matches both.
-            <NavLink key={entry.to} to={entry.to} className="nb-rail-item">
-              <span className="block text-sm">{entry.title}</span>
-              <span className="nb-rail-sub block text-[11px]">{entry.sub}</span>
+            // buttons, where "true" was right). The stylesheet matches both.
+            <NavLink key={entry.to} to={entry.to} className="console-nav-item">
+              <span className="console-nav-icon" aria-hidden="true">
+                {entry.icon}
+              </span>
+              {entry.title}
             </NavLink>
           ))}
         </nav>
+
         <TenantCard />
       </aside>
 
-      <main
-        className="nb-scroll relative flex-1 overflow-auto"
-        style={{ minWidth: isWidget ? 0 : 1180 }}
-      >
-        <Outlet />
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Not above the sidebar, but beside it. The brand stays at the top
+            of its own column, which is what makes the sidebar read as the
+            product and the bar as the page's controls. */}
+        {isWidget ? null : (
+          <header className="console console-topbar">
+            <GlobalSearch />
+            <div className="ml-auto flex items-center gap-2">
+              {/* Clerk owns the account menu and the org switcher. Both carry
+                  sign-out, membership and profile management, which is a lot
+                  of surface not worth rebuilding to save a theming pass.
+
+                  No notification bell. The reference has one with an unread
+                  dot on it and there is nothing in the product that raises a
+                  notification, so the dot would be decoration claiming to be
+                  a count. */}
+              <Show when="signed-in">
+                <OrganizationSwitcher
+                  hidePersonal
+                  afterCreateOrganizationUrl="/setup"
+                  afterSelectOrganizationUrl="/leads"
+                />
+                <UserButton />
+              </Show>
+              <Show when="signed-out">
+                <Link className="console-btn" data-variant="secondary" to="/login">
+                  Sign in
+                </Link>
+              </Show>
+            </div>
+          </header>
+        )}
+
+        <main
+          className="nb-scroll relative min-h-0 flex-1 overflow-auto"
+          style={{ minWidth: isWidget ? 0 : 1180 }}
+        >
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
 
 function Brand() {
   return (
-    <div className="flex items-center gap-[10px] px-1.5">
-      <div
-        className="grid h-[34px] w-[34px] place-items-center rounded-pill font-heading text-[17px]"
-        style={{
-          background: "var(--color-accent-200)",
-          color: "var(--color-accent-800)",
-        }}
-        aria-hidden="true"
-      >
+    <div className="console-brand">
+      <div className="console-brand-mark" aria-hidden="true">
         N
       </div>
-      <div>
-        <div className="font-heading text-[19px] leading-none">Northbound</div>
-        <div
-          className="text-[10.5px] uppercase tracking-[0.07em]"
-          style={{ color: "var(--color-neutral-600)" }}
-        >
-          v1 prototype
-        </div>
+      <div className="min-w-0">
+        <div className="console-brand-name">Northbound</div>
+        <div className="console-brand-sub">Student consultancy CRM</div>
       </div>
     </div>
   );
 }
 
+/** The agency, at the foot of the rail.
+ *
+ * The reference puts a marketing card here — "Helping students find a brighter
+ * future". This keeps the shape and the mortarboard and spends the space on
+ * which agency you are signed into and how big it is, because that is the
+ * question somebody with two browser profiles open actually has.
+ */
 function TenantCard() {
   const [counsellorCount, setCounsellorCount] = useState<number | null>(null);
   const [line, setLine] = useState<string>("");
@@ -146,56 +180,25 @@ function TenantCard() {
   }, []);
 
   return (
-    <div
-      className="mt-auto rounded-md p-[14px]"
-      style={{ background: "var(--color-neutral-200)" }}
-    >
-      <div
-        className="text-[10.5px] uppercase tracking-[0.07em]"
-        style={{ color: "var(--color-neutral-600)" }}
-      >
-        Agency
-      </div>
+    <div className="console-tenant">
+      <GraduationIcon size={22} className="console-tenant-icon" />
 
       {/* Core 3 replaced <SignedIn>/<SignedOut> with <Show when={...}>. */}
       <Show when="signed-out">
-        <div className="font-heading text-[15px] leading-tight">
-          Not signed in
-        </div>
-        <div
-          className="mt-1 text-[11.5px]"
-          style={{ color: "var(--color-neutral-700)" }}
-        >
+        <div className="console-tenant-name">Not signed in</div>
+        <div className="console-tenant-sub">
           <Link to="/login">Sign in</Link> to load your agency.
         </div>
       </Show>
 
       <Show when="signed-in">
-        <div className="font-heading text-[15px] leading-tight">
+        <div className="console-tenant-name">
           {isLoaded ? (organization?.name ?? "No agency selected") : "…"}
         </div>
-        <div
-          className="mt-1 text-[11.5px]"
-          style={{ color: "var(--color-neutral-700)" }}
-        >
+        <div className="console-tenant-sub">
           {counsellorCount === null
             ? line
             : `${counsellorCount} counsellors · ${line}`}
-        </div>
-
-        <div
-          className="mt-3 flex items-center gap-2 pt-3"
-          style={{ borderTop: "1px solid var(--color-divider)" }}
-        >
-          {/* Clerk owns the account menu and the org switcher. Both carry
-              sign-out, membership and profile management, which is a lot of
-              surface not worth rebuilding to save a theming pass. */}
-          <UserButton />
-          <OrganizationSwitcher
-            hidePersonal
-            afterCreateOrganizationUrl="/setup"
-            afterSelectOrganizationUrl="/leads"
-          />
         </div>
       </Show>
     </div>

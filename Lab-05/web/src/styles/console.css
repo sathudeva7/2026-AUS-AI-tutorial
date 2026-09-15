@@ -15,7 +15,18 @@
  * with either.
  */
 
-.console {
+/* Tokens only, and deliberately separate from the typography below.
+ *
+ * `.console-shell` wraps the WHOLE app — sidebar, top bar and every route —
+ * so anything it sets is inherited by routes that still run on Organic. The
+ * custom properties are safe to inherit (nothing reads one unless it asks);
+ * a font-family and a 15px base are not. That is why the shell gets this
+ * block and `.console` gets both.
+ *
+ * The original rule still holds: nothing outside a `.console` subtree changes
+ * how it looks. The chrome opts in by carrying the class itself. */
+.console,
+.console-shell {
   /* Paper rather than cream, ink rather than black. Pure #fff over pure #000
      is the harshest pairing available and nobody reads it comfortably for a
      working day. */
@@ -53,17 +64,43 @@
   --t-section: 17px;
   --t-name: 30px;
 
-  /* Tight, consistent radii. 16px on a data card reads as a consumer app. */
+  /* Two radius families, not one.
+     Dense controls stay tight — 16px on a phone-number input reads as a
+     consumer app. The containers the redesign introduces (panels, cards, stat
+     tiles) are large enough to carry a softer corner without reading as toy,
+     and a 6px radius on a 900px panel just looks like a rendering mistake. */
   --r-sm: 4px;
   --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+  --r-pill: 999px;
 
+  /* The ground behind the panels. Panels are white; without a distinct ground
+     under them the rounded corners have nothing to be rounded against. */
+  --c-ground: #f4f5f2;
+
+}
+
+.console {
   font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   font-size: var(--t-body);
   line-height: 1.5;
   color: var(--c-ink-body);
-  background: var(--c-paper);
+  background: var(--c-ground);
   /* Figures line up in a column of phone numbers and country counts. */
   font-variant-numeric: tabular-nums;
+}
+
+/* The frame itself. No typography — see the note above the token block.
+   Organic's cream, not the console grey: this is the ground behind routes
+   that are still drawn in Organic, and repainting it would restyle every one
+   of them from underneath. The console's own routes paint their grey
+   themselves — see `.console-page`. */
+.console-shell {
+  display: flex;
+  height: 100vh;
+  overflow-y: hidden;
+  background: var(--color-bg);
 }
 
 /* Headings are the body face at a heavier weight. One family, used with
@@ -116,7 +153,7 @@
   cursor: pointer;
   padding: 10px 12px;
   border: 1px solid transparent;
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   background: transparent;
   font: inherit;
   color: inherit;
@@ -131,7 +168,7 @@
    competing buttons. */
 .console-row[aria-current="true"] {
   background: var(--c-accent-soft);
-  box-shadow: inset 2px 0 0 var(--c-accent);
+  box-shadow: inset 3px 0 0 var(--c-accent);
 }
 
 .console-row:focus-visible,
@@ -140,18 +177,45 @@
   outline-offset: 2px;
 }
 
+/* Round, and tinted with the accent rather than grey.
+   There is no photo field on `users` and inventing one would mean shipping a
+   screen that shows a stock face for every real person. Initials on the
+   accent tint is the same silhouette doing an honest job. */
 .console-avatar {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
   flex: none;
-  border-radius: var(--r-sm);
-  background: #eef0ed;
-  color: var(--c-ink-muted);
-  font-size: 11px;
+  border-radius: var(--r-pill);
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+/* overflow-hidden so a photo is clipped to the circle. Without it the image
+   squares off the corners and the avatar stops matching every other one on
+   the screen. */
+.console-avatar {
+  overflow: hidden;
+}
+
+.console-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* cover, not contain: a portrait is cropped to fill the circle rather than
+     letterboxed inside it with the tint showing through at the sides. */
+  object-fit: cover;
+}
+
+.console-avatar[data-size="lg"] {
+  width: 76px;
+  height: 76px;
+  font-size: 26px;
+  letter-spacing: 0.01em;
 }
 
 .console-row[aria-current="true"] .console-avatar {
@@ -212,7 +276,7 @@
 .console-card {
   background: var(--c-card);
   border: 1px solid var(--c-line);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
 }
 
 .console-card-head {
@@ -244,7 +308,13 @@
 
 .console-dl dd {
   margin: 0;
+  min-width: 0;
   color: var(--c-ink);
+  /* An email address is one unbreakable token as far as the line-breaker is
+     concerned, so in a half-width card it does not wrap — it runs out past
+     the border and gets clipped. `anywhere` is right here and truncation is
+     not: the tail of an address is the half that identifies it. */
+  overflow-wrap: anywhere;
 }
 
 /* ------------------------------------------------------------------ *
@@ -306,7 +376,7 @@
   gap: 6px;
   height: 34px;
   padding: 0 14px;
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   border: 1px solid transparent;
   font: inherit;
   font-size: 14px;
@@ -491,14 +561,27 @@
   background: var(--c-card);
 }
 
+/* The cell is the hit target and carries the grid rule; the block you
+   actually see is the span inside it.
+   Two elements rather than one because the painted block is inset and
+   rounded while the rule between cells is full-bleed and square — a single
+   box cannot be both, and rounding the cell itself bends the grid lines. */
 .console-cell {
-  height: 18px;
+  position: relative;
+  height: 22px;
   border: 0;
   border-left: 1px solid var(--c-line);
   border-top: 1px solid #f1f2ef;
   background: var(--c-card);
   padding: 0;
   cursor: pointer;
+}
+
+.console-cell-fill {
+  position: absolute;
+  inset: 1px 3px;
+  border-radius: 5px;
+  background: transparent;
 }
 
 /* A heavier rule on the hour, so the eye can count without labels on every
@@ -508,16 +591,25 @@
   border-top: 1px solid var(--c-line);
 }
 
-.console-cell:hover:not(:disabled) {
+.console-cell:hover:not(:disabled) .console-cell-fill {
   background: var(--c-accent-soft);
 }
 
-.console-cell[data-on="true"] {
+/* Saved hours. */
+.console-cell[data-on="true"] .console-cell-fill {
   background: var(--c-accent);
-  border-top-color: color-mix(in srgb, #fff 22%, var(--c-accent));
 }
 
-.console-cell[data-on="true"]:hover:not(:disabled) {
+/* Painted in this sitting and not yet written. Legend calls it "Selected".
+   Worth its own colour: the difference between hours a student can already
+   book and hours that vanish if you close the tab is the one thing this grid
+   cannot afford to be vague about. */
+.console-cell[data-on="true"][data-pending="true"] .console-cell-fill {
+  background: color-mix(in srgb, var(--c-accent) 32%, #fff);
+  box-shadow: inset 0 0 0 1.5px var(--c-accent);
+}
+
+.console-cell[data-on="true"]:hover:not(:disabled) .console-cell-fill {
   background: var(--c-accent-hover);
 }
 
@@ -551,13 +643,1361 @@
   background: var(--c-accent);
 }
 
-/* Booked meetings have no table yet. The swatch is drawn hollow so the legend
-   states the plan without the grid implying data that does not exist. */
-.console-swatch[data-kind="booked"] {
-  background: repeating-linear-gradient(
-    45deg,
-    var(--c-line-strong) 0 2px,
-    transparent 2px 4px
-  );
+.console-swatch[data-kind="unavailable"] {
+  background: var(--c-card);
   border: 1px solid var(--c-line-strong);
+}
+
+.console-swatch[data-kind="selected"] {
+  background: color-mix(in srgb, var(--c-accent) 32%, #fff);
+  box-shadow: inset 0 0 0 1.5px var(--c-accent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Panels
+ *
+ * The screen is two white panels floating on a warm grey ground, rather than
+ * a flush rail butted against a scrolling pane. The gap between them is what
+ * says "these are two different things" — previously that job was done by a
+ * 1px border, which at this density disappeared into the grid lines below it.
+ * ------------------------------------------------------------------ */
+
+.console-page {
+  display: flex;
+  gap: 14px;
+  /* 100% of the scroll pane, not 100vh. The top bar sits above this now, so a
+     viewport-height page overflows by exactly the height of the bar. */
+  height: 100%;
+  padding: 14px;
+  background: var(--c-ground);
+}
+
+.console-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-xl);
+  background: var(--c-card);
+  overflow: hidden;
+}
+
+.console-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 0;
+}
+
+.console-panel-title {
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.console-panel-sub {
+  margin: 4px 0 0;
+  font-size: var(--t-meta);
+  line-height: 1.5;
+  color: var(--c-ink-muted);
+}
+
+/* ------------------------------------------------------------------ *
+ * Icon-only controls
+ * ------------------------------------------------------------------ */
+
+.console-icon-btn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  background: transparent;
+  color: var(--c-ink-body);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.console-icon-btn[data-variant="primary"] {
+  background: var(--c-accent);
+  color: #fff;
+}
+.console-icon-btn[data-variant="primary"]:hover:not(:disabled) {
+  background: var(--c-accent-hover);
+}
+
+.console-icon-btn[data-variant="secondary"] {
+  border-color: var(--c-line-strong);
+  background: var(--c-card);
+}
+.console-icon-btn[data-variant="secondary"]:hover:not(:disabled) {
+  background: #f4f5f3;
+}
+
+.console-icon-btn[data-variant="ghost"]:hover:not(:disabled) {
+  background: #f1f2ef;
+}
+
+/* On while a popover or a filter it owns is showing. */
+.console-icon-btn[aria-expanded="true"],
+.console-icon-btn[aria-pressed="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Search
+ * ------------------------------------------------------------------ */
+
+.console-search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.console-search .console-input {
+  padding-left: 34px;
+}
+
+.console-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  transform: translateY(-50%);
+  color: var(--c-ink-faint);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * Filter chips
+ *
+ * Each carries its own count. A filter that hides everything is confusing
+ * until you can see, before clicking, that the answer is going to be nought —
+ * "Unassigned (0)" is doing more work than the tab it sits in.
+ * ------------------------------------------------------------------ */
+
+.console-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.console-chip {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-pill);
+  background: var(--c-card);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-ink-muted);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.console-chip:hover:not([aria-pressed="true"]) {
+  background: #f4f5f3;
+}
+
+.console-chip[aria-pressed="true"],
+.console-chip[aria-checked="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+}
+
+.console-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------------ *
+ * Forms laid out in a grid
+ *
+ * A row of fields with their own labels, rather than a 132px label column.
+ * The editor's fields are short and sit side by side; the contact card's are
+ * a record being read, which is a different shape and keeps its <dl>.
+ * ------------------------------------------------------------------ */
+
+.console-form-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.console-form-grid[data-cols="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.console-form-grid[data-cols="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .console-form-grid[data-cols="2"],
+  .console-form-grid[data-cols="3"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * The sticky action bar at the foot of an editor
+ *
+ * Sticky, because the form is long and the summary in it is the reason the
+ * Save button is disabled. A footer you have to scroll to in order to find
+ * out why you cannot save is a footer that gets sworn at.
+ * ------------------------------------------------------------------ */
+
+.console-actionbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-xl);
+  background: var(--c-card);
+  box-shadow: 0 -6px 20px rgb(22 24 29 / 6%);
+}
+
+.console-actionbar-note {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-meta);
+  line-height: 1.5;
+  color: var(--c-ink-muted);
+}
+
+/* Amber rather than red: an incomplete form is not an error, it is a form
+   somebody is still filling in. */
+.console-actionbar-note[data-tone="blocked"] {
+  color: var(--c-warn);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ *
+ * The requirement grid, shared by the editor and the catalogue's rules tab
+ * ------------------------------------------------------------------ */
+
+.console-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.console-rule {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+}
+
+.console-rule-key {
+  font-size: var(--t-meta);
+  font-weight: 500;
+  color: var(--c-ink);
+}
+
+/* Monospace. A rule is an expression — `bachelor_years>=4` — and a
+   proportional face makes >= and > hard to tell apart at 13px.
+   whitespace: nowrap so the track's max-content measurement is the whole
+   expression on one line, rather than whatever it wraps to. */
+.console-rule-expr {
+  padding: 0 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  white-space: nowrap;
+  color: var(--c-ink);
+}
+
+.console-rule-note {
+  min-width: 0;
+  font-size: var(--t-meta);
+  line-height: 1.45;
+  color: var(--c-ink-muted);
+}
+
+.console-rule-key {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ *
+ * Dismissible notice
+ *
+ * The coverage-gap banner, restyled. Dismissal is for this visit only and is
+ * deliberately not persisted: the gap is still there tomorrow, and a warning
+ * somebody silenced once in March is a warning nobody ever sees again.
+ * ------------------------------------------------------------------ */
+
+.console-notice {
+  display: flex;
+  gap: 10px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid var(--c-warn-line);
+  border-radius: var(--r-lg);
+  background: var(--c-warn-soft);
+}
+
+.console-notice-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--c-warn);
+}
+
+.console-notice-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--c-warn);
+}
+
+.console-notice-body {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #6f4d1a;
+}
+
+.console-notice-dismiss {
+  flex: none;
+  align-self: flex-start;
+  margin: -2px -2px 0 0;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-warn);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.console-notice-dismiss:hover {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ *
+ * Profile header
+ * ------------------------------------------------------------------ */
+
+.console-profile {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+/* A pill, not the bare dot the list rows use. On a row among nine others a
+   coloured pill turns the list into a traffic light; here there is exactly
+   one status on screen and it can afford the weight. */
+.console-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-pill);
+  background: var(--c-card);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-ink-muted);
+}
+
+.console-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.console-pill[data-status="active"] {
+  border-color: color-mix(in srgb, var(--c-ok) 30%, #fff);
+  background: var(--c-ok-soft);
+  color: var(--c-ok);
+}
+
+.console-pill[data-status="invited"] {
+  border-color: var(--c-warn-line);
+  background: var(--c-warn-soft);
+  color: var(--c-warn);
+}
+
+.console-pill[data-status="deactivated"] {
+  color: var(--c-ink-faint);
+}
+
+/* ------------------------------------------------------------------ *
+ * Contact rows
+ *
+ * A <dl> still, because that is what a list of labelled values is. The icon
+ * is decorative and lives inside the <dt> beside the word it illustrates —
+ * it never replaces the label, so the record reads the same with images off.
+ * ------------------------------------------------------------------ */
+
+.console-dl[data-variant="icons"] {
+  /* Narrower than the plain variant: the icon adds 26px to the label and the
+     card is half-width now, so the value column needs the room back. */
+  grid-template-columns: 124px minmax(0, 1fr);
+  gap: 14px 12px;
+}
+
+.console-dl[data-variant="icons"] dt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Pinned to the top of its row rather than stretched down it. The countries
+     row runs to several lines and a grid cell stretches by default, which
+     floated the word "Countries" halfway down a block of chips while every
+     label above it sat on its value's first line. */
+  align-self: start;
+}
+
+.console-dl-icon {
+  flex: none;
+  color: var(--c-ink-faint);
+}
+
+/* ------------------------------------------------------------------ *
+ * Empty boxes
+ *
+ * Dashed, so "nothing here yet" never reads as a card that failed to load.
+ * ------------------------------------------------------------------ */
+
+.console-emptybox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  border: 1px dashed var(--c-line-strong);
+  border-radius: var(--r-lg);
+  text-align: center;
+}
+
+.console-emptybox-icon {
+  color: var(--c-ink-faint);
+}
+
+.console-emptybox-title {
+  font-size: var(--t-body);
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.console-emptybox-body {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--t-meta);
+  line-height: 1.55;
+  color: var(--c-ink-muted);
+}
+
+/* ------------------------------------------------------------------ *
+ * Country chips that can be removed
+ * ------------------------------------------------------------------ */
+
+.console-country[data-removable="true"] {
+  padding-right: 3px;
+  gap: 4px;
+}
+
+.console-country-remove {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-ink-muted);
+  cursor: pointer;
+}
+
+.console-country-remove:hover {
+  background: #eceee9;
+  color: var(--c-ink);
+}
+
+/* ------------------------------------------------------------------ *
+ * Availability footer
+ * ------------------------------------------------------------------ */
+
+.console-weekhours {
+  font-size: var(--t-meta);
+  font-weight: 500;
+  color: var(--c-ink);
+}
+
+/* ------------------------------------------------------------------ *
+ * A field group inside a card, below the one above it
+ *
+ * Countries live in the contact card now rather than in a card of their own.
+ * One person's details are one record; splitting four of them into a panel
+ * and the fifth into a panel beside it made the layout the subject.
+ * ------------------------------------------------------------------ */
+
+.console-card-split {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--c-line);
+}
+
+/* The inline "add" affordance, shaped like the chips it sits among rather
+   than like a button parked beside them. */
+.console-chip-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  border: 1px dashed var(--c-line-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-ink-muted);
+  cursor: pointer;
+}
+
+.console-chip-add:hover:not(:disabled) {
+  border-color: var(--c-accent);
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Lead rows
+ *
+ * A list, not a table. Three fields per lead and no column worth aligning
+ * across rows — a table here would be five borders drawn around one fact.
+ * ------------------------------------------------------------------ */
+
+.console-lead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 2px;
+  border-top: 1px solid var(--c-line);
+}
+
+.console-lead:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.console-lead-name {
+  font-size: var(--t-body);
+  font-weight: 500;
+  color: var(--c-ink);
+}
+
+.console-lead-sub {
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+/* Escalated is the one that means "somebody must ring this student", so it is
+   the only status that gets a colour. Painting all five turns a caseload into
+   a chart nobody can read at a glance. */
+.console-lead-status {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-pill);
+  background: var(--c-card);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-ink-muted);
+}
+
+.console-lead-status[data-status="escalated"] {
+  border-color: var(--c-warn-line);
+  background: var(--c-warn-soft);
+  color: var(--c-warn);
+}
+
+.console-lead-status[data-status="converted"] {
+  border-color: color-mix(in srgb, var(--c-ok) 30%, #fff);
+  background: var(--c-ok-soft);
+  color: var(--c-ok);
+}
+
+/* Inline code in the "cannot be matched" notice — it names an endpoint and a
+   column, and those read as identifiers rather than prose. */
+.console-notice-body code {
+  padding: 1px 4px;
+  border: 1px solid var(--c-warn-line);
+  border-radius: var(--r-sm);
+  background: #fffaf0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+
+/* ------------------------------------------------------------------ *
+ * The shell: sidebar and top bar
+ *
+ * `.console` now wraps the whole app rather than one route, so the tokens at
+ * the top of this file are the product's, not the roster's. Nothing outside
+ * a `.console` subtree still exists in the console — the student widget opts
+ * out of the chrome entirely, which is the one place Organic still runs.
+ * ------------------------------------------------------------------ */
+
+.console-rail-nav {
+  display: flex;
+  flex: none;
+  width: 246px;
+  min-width: 246px;
+  flex-direction: column;
+  gap: 22px;
+  padding: 18px 14px;
+  background: var(--c-card);
+  border-right: 1px solid var(--c-line);
+}
+
+/* --- brand ---------------------------------------------------------- */
+
+.console-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 2px 6px;
+}
+
+.console-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: var(--r-lg);
+  background: var(--c-accent);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.console-brand-name {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--c-ink);
+}
+
+.console-brand-sub {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--c-ink-muted);
+}
+
+/* --- navigation ------------------------------------------------------ */
+
+.console-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.console-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+  border-radius: var(--r-lg);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--c-ink-body);
+  text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.console-nav-item:hover {
+  background: #f4f5f3;
+  color: var(--c-ink);
+}
+
+/* NavLink sets aria-current="page"; the older button rail used "true". Both
+   are matched so neither markup silently loses its active state. */
+.console-nav-item[aria-current="page"],
+.console-nav-item[aria-current="true"] {
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  font-weight: 600;
+}
+
+.console-nav-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--c-ink-faint);
+}
+
+.console-nav-item:hover .console-nav-icon {
+  color: var(--c-ink-muted);
+}
+
+.console-nav-item[aria-current="page"] .console-nav-icon,
+.console-nav-item[aria-current="true"] .console-nav-icon {
+  color: var(--c-accent);
+}
+
+/* --- the agency card at the foot ------------------------------------- */
+
+.console-tenant {
+  margin-top: auto;
+  padding: 16px;
+  border-radius: var(--r-xl);
+  background: var(--c-accent-soft);
+}
+
+.console-tenant-icon {
+  color: var(--c-accent);
+}
+
+.console-tenant-name {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--c-ink);
+}
+
+.console-tenant-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--c-ink-body);
+}
+
+.console-tenant-sub a {
+  color: var(--c-accent);
+}
+
+/* --- top bar --------------------------------------------------------- */
+
+.console-topbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  padding: 0 18px;
+  background: var(--c-card);
+  border-bottom: 1px solid var(--c-line);
+}
+
+/* Centred, and capped. Stretched across a 2560px monitor a search field
+   stops reading as a control and starts reading as a divider. */
+.console-topsearch {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.console-topsearch .console-input {
+  padding-left: 36px;
+  border-radius: var(--r-pill);
+  background: var(--c-paper);
+}
+
+.console-topsearch .console-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  transform: translateY(-50%);
+  color: var(--c-ink-faint);
+  pointer-events: none;
+}
+
+/* --- search results -------------------------------------------------- */
+
+.console-results {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-lg);
+  background: var(--c-card);
+  box-shadow: 0 12px 28px rgb(22 24 29 / 12%);
+}
+
+.console-result {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Driven by data-active, not :hover, so the keyboard and the mouse highlight
+   the same row — two independent highlights is how you press Enter and open
+   something other than the thing you were looking at. */
+.console-result[data-active="true"] {
+  background: var(--c-accent-soft);
+}
+
+.console-result-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-ink);
+}
+
+.console-result-detail {
+  display: block;
+  font-size: 12.5px;
+  color: var(--c-ink-muted);
+}
+
+.console-result-group {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--c-ink-faint);
+}
+
+/* --- Clerk's widgets, inside the bar --------------------------------- */
+
+.console-topbar .cl-avatarBox {
+  width: 30px;
+  height: 30px;
+}
+
+/* ------------------------------------------------------------------ *
+ * The modal sheet
+ *
+ * Same tokens, radii and type as the roster behind it. A dialog drawn in a
+ * different design system reads as another product's window opening on top
+ * of this one, which is what the Organic sheet did here.
+ * ------------------------------------------------------------------ */
+
+.console-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--c-ink) 42%, transparent);
+}
+
+.console-sheet {
+  position: fixed;
+  z-index: 50;
+  top: 7vh;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  /* Narrower than the 760px it replaces. The form is two fields now, and a
+     760px sheet around them is mostly empty paper. */
+  width: 560px;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 14vh);
+  overflow-y: auto;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-xl);
+  background: var(--c-card);
+  box-shadow: 0 24px 60px rgb(22 24 29 / 22%);
+}
+
+.console-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.console-sheet-title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  color: var(--c-ink);
+}
+
+.console-sheet-sub {
+  margin: 6px 0 0;
+  max-width: 54ch;
+  font-size: var(--t-meta);
+  line-height: 1.55;
+  color: var(--c-ink-muted);
+}
+
+.console-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 20px 22px;
+}
+
+.console-sheet-foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--c-line);
+  background: var(--c-card);
+}
+
+/* ------------------------------------------------------------------ *
+ * A radio that is a whole row
+ *
+ * Roles carry a sentence each — the difference between a manager and an
+ * owner is the reason somebody is choosing — so the target is the row and
+ * not a 16px circle beside it.
+ * ------------------------------------------------------------------ */
+
+.console-choice {
+  display: flex;
+  gap: 11px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-lg);
+  background: var(--c-card);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.console-choice:hover:not(:disabled) {
+  background: #f4f5f3;
+}
+
+.console-choice[aria-checked="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-accent-soft);
+}
+
+.console-choice:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.console-choice-dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 2px solid var(--c-line-strong);
+  border-radius: 50%;
+  background: var(--c-card);
+}
+
+.console-choice[aria-checked="true"] .console-choice-dot {
+  border-color: var(--c-accent);
+  /* The filled centre, drawn with a ring rather than a pseudo-element so the
+     dot stays one box to align. */
+  box-shadow: inset 0 0 0 3px var(--c-card);
+  background: var(--c-accent);
+}
+
+.console-choice-label {
+  display: block;
+  font-size: var(--t-body);
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.console-choice-note {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--t-meta);
+  line-height: 1.55;
+  color: var(--c-ink-muted);
+}
+
+/* ------------------------------------------------------------------ *
+ * Confirmation
+ *
+ * Green, and it stays on screen rather than closing the sheet — an agency
+ * onboarding a branch invites four people in a row.
+ * ------------------------------------------------------------------ */
+
+.console-sent {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--c-ok) 30%, #fff);
+  border-radius: var(--r-lg);
+  background: var(--c-ok-soft);
+  font-size: var(--t-meta);
+  line-height: 1.55;
+  color: #2b5a44;
+}
+
+.console-sent-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--c-ok);
+}
+
+/* ------------------------------------------------------------------ *
+ * A full-width working page (as opposed to the roster's two panels)
+ * ------------------------------------------------------------------ */
+
+.console-sheet-page {
+  min-height: 100%;
+  padding: 20px 22px 48px;
+  background: var(--c-ground);
+}
+
+.console-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 14px;
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+.console-crumbs-sep {
+  color: var(--c-ink-faint);
+}
+
+/* A crumb that goes back. A button rather than a link because it is a
+   client-side navigation with no URL worth middle-clicking to. */
+.console-crumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+  cursor: pointer;
+}
+
+.console-crumb-link:hover {
+  color: var(--c-accent);
+  text-decoration: underline;
+}
+
+.console-page-title {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.console-page-sub {
+  margin: 6px 0 0;
+  max-width: 76ch;
+  font-size: var(--t-body);
+  line-height: 1.5;
+  color: var(--c-ink-muted);
+}
+
+/* ------------------------------------------------------------------ *
+ * Stat tiles
+ *
+ * Back, and on the right screen this time. These were briefly on a
+ * counsellor's record, where they described the AGENCY rather than the person
+ * whose page it was and duplicated the roster beside them. Here they describe
+ * the catalogue, on the catalogue page, and every figure is counted from the
+ * rows in the table below.
+ * ------------------------------------------------------------------ */
+
+.console-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.console-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+}
+
+.console-tile-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-lg);
+  background: var(--c-card);
+}
+
+.console-tile-value {
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--c-ink);
+}
+
+.console-tile-label {
+  margin-top: 2px;
+  font-size: var(--t-meta);
+  color: var(--c-ink-body);
+}
+
+.console-tile[data-tone="accent"] {
+  border-color: color-mix(in srgb, var(--c-accent) 18%, #fff);
+  background: var(--c-accent-soft);
+}
+.console-tile[data-tone="accent"] .console-tile-icon { color: var(--c-accent); }
+
+.console-tile[data-tone="info"] {
+  border-color: #d7e3f0;
+  background: #eef4fa;
+}
+.console-tile[data-tone="info"] .console-tile-icon { color: #2b5c8a; }
+
+.console-tile[data-tone="warn"] {
+  border-color: var(--c-warn-line);
+  background: var(--c-warn-soft);
+}
+.console-tile[data-tone="warn"] .console-tile-icon { color: var(--c-warn); }
+
+/* Red, and only for the count of entries the agent may not state. Nothing
+   else on this page gets to use it. */
+.console-tile[data-tone="danger"] {
+  border-color: #f0d7d5;
+  background: #fdf0ef;
+}
+.console-tile[data-tone="danger"] .console-tile-icon { color: var(--c-danger); }
+
+/* ------------------------------------------------------------------ *
+ * Tabs
+ * ------------------------------------------------------------------ */
+
+.console-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-pill);
+  background: var(--c-card);
+}
+
+.console-tab {
+  height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--c-ink-muted);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.console-tab:hover[aria-selected="false"] {
+  color: var(--c-ink);
+}
+
+.console-tab[aria-selected="true"] {
+  background: var(--c-accent);
+  color: #fff;
+}
+
+/* ------------------------------------------------------------------ *
+ * Toolbar above a table
+ * ------------------------------------------------------------------ */
+
+.console-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 12px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Data table
+ * ------------------------------------------------------------------ */
+
+.console-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-xl);
+  background: var(--c-card);
+}
+
+.console-table {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: collapse;
+  font-size: var(--t-body);
+}
+
+.console-table thead th {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--c-line);
+  background: #fafbf9;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-ink-muted);
+  white-space: nowrap;
+}
+
+.console-table tbody td {
+  padding: 12px 16px;
+  border-top: 1px solid var(--c-line);
+  vertical-align: middle;
+}
+
+.console-table tbody tr:hover {
+  background: #f7f8f6;
+}
+
+.console-table tbody tr[data-clickable="true"] {
+  cursor: pointer;
+}
+
+.console-cell-title {
+  font-weight: 500;
+  color: var(--c-ink);
+}
+
+.console-cell-sub {
+  margin-top: 2px;
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+/* The square institution mark. Not round: it stands for an organisation, and
+   the round ones on this product are people. */
+.console-org {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: var(--r-md);
+  background: #eef0ed;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--c-ink-muted);
+}
+
+.console-flag {
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* ------------------------------------------------------------------ *
+ * Row menu
+ * ------------------------------------------------------------------ */
+
+.console-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.console-menu-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 168px;
+  padding: 5px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-lg);
+  background: var(--c-card);
+  box-shadow: 0 12px 28px rgb(22 24 29 / 14%);
+}
+
+.console-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: var(--c-ink);
+  cursor: pointer;
+}
+
+.console-menu-item[data-active="true"] {
+  background: var(--c-accent-soft);
+}
+
+.console-menu-item[data-danger="true"] {
+  margin-top: 4px;
+  border-top: 1px solid var(--c-line);
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  padding-top: 10px;
+  color: var(--c-danger);
+}
+
+.console-menu-item[data-danger="true"][data-active="true"] {
+  background: #fdf0ef;
+}
+
+/* ------------------------------------------------------------------ *
+ * Pagination
+ * ------------------------------------------------------------------ */
+
+.console-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.console-page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-md);
+  background: var(--c-card);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--c-ink);
+  cursor: pointer;
+}
+
+.console-page-btn:hover:not(:disabled) {
+  background: #f4f5f3;
+}
+
+.console-page-btn[aria-current="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-accent);
+  color: #fff;
+}
+
+.console-page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }

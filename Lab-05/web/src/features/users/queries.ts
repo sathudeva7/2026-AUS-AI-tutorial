@@ -9,19 +9,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { leadsKeyRoot, usersKeys } from "./keys";
 import * as api from "./api";
-import type { AvailabilityRule, Role } from "./types";
+import type { AvailabilityRule, Role, UserListParams } from "./types";
 
 /** The roster. One request draws the whole table: `countries` come back
  *  inline, so there is no per-row follow-up. Hours are deliberately NOT here
  *  — they are fetched when somebody opens a person, not 40 times to render a
  *  list nobody has clicked. */
-export function useUsers(
-  params: {
-    status?: "active" | "invited" | "deactivated" | "all";
-    limit?: number;
-    offset?: number;
-  } = {},
-) {
+export function useUsers(params: UserListParams = {}) {
   return useQuery({
     queryKey: usersKeys.list(params),
     queryFn: () => api.listUsers(params),

@@ -143,9 +143,17 @@ export function sameRules(
   );
 }
 
-/** Total hours painted, for the summary line. */
-export function totalHours(cells: Set<string>): number {
-  return (cells.size * SLOT_MINUTES) / 60;
+/** The week's total as "18h 30m".
+ *
+ * Hours and minutes rather than "18.5 hours". The grid works in half-hours,
+ * so a decimal is always going to be .0 or .5 — two values pretending to be a
+ * continuous scale — and nobody writes their working week as a fraction.
+ */
+export function formatWeeklyHours(cells: Set<string>): string {
+  const minutes = cells.size * SLOT_MINUTES;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${String(m).padStart(2, "0")}m`;
 }
 
 /** The Monday of the week `date` falls in.

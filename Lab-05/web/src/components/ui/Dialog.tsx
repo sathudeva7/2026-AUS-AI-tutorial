@@ -1,14 +1,19 @@
 /** The one true modal in the console: invite a counsellor.
  *
  * Radix supplies focus trap, focus restore, ESC, scroll lock and the
- * `aria-modal` wiring. The visual shell is the prototype's — a 760px sheet
- * pinned near the top of the viewport with its own scroll, over a dimmed
- * neutral-900 backdrop.
+ * `aria-modal` wiring. The visual shell is the console's — a white sheet on
+ * the same tokens, radii and type as the roster behind it, because a dialog
+ * drawn in a different design system reads as another product's window that
+ * has opened on top of this one.
+ *
+ * It carries `.console` itself. The sheet is portalled to the document body,
+ * outside the shell's subtree, so it inherits none of the console's type
+ * unless it says so here.
  */
 import * as RadixDialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "./index";
+import { CloseIcon } from "./icons";
 
 export function Dialog({
   open,
@@ -31,63 +36,36 @@ export function Dialog({
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay
-          className="fixed inset-0 z-40"
-          style={{
-            background:
-              "color-mix(in srgb, var(--color-neutral-900) 50%, transparent)",
-          }}
-        />
+        <RadixDialog.Overlay className="console-overlay" />
         <RadixDialog.Content
-          className={cn(
-            "nb-scroll fixed left-1/2 top-8 z-50 flex max-h-[calc(100vh-4rem)] w-[760px] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-lg shadow-lg",
-            className,
-          )}
-          style={{ background: "var(--color-neutral-100)" }}
+          className={cn("console console-sheet nb-scroll", className)}
         >
-          <div
-            className="px-7 pb-4 pt-6"
-            style={{ borderBottom: "1px solid var(--color-divider)" }}
-          >
-            <div className="flex items-start gap-3">
-              <div>
-                <RadixDialog.Title className="m-0 font-heading text-[26px] leading-tight">
-                  {title}
-                </RadixDialog.Title>
-                {description ? (
-                  <RadixDialog.Description
-                    className="mb-0 mt-2 max-w-[62ch] text-[13px]"
-                    style={{ color: "var(--color-neutral-700)" }}
-                  >
-                    {description}
-                  </RadixDialog.Description>
-                ) : null}
-              </div>
-              <RadixDialog.Close asChild>
-                <Button
-                  variant="ghost"
-                  aria-label="Close"
-                  className="ml-auto px-3 py-1.5 text-base"
-                >
-                  ×
-                </Button>
-              </RadixDialog.Close>
+          <div className="console-sheet-head">
+            <div className="min-w-0 flex-1">
+              <RadixDialog.Title className="console-sheet-title">
+                {title}
+              </RadixDialog.Title>
+              {description ? (
+                <RadixDialog.Description className="console-sheet-sub">
+                  {description}
+                </RadixDialog.Description>
+              ) : null}
             </div>
+            <RadixDialog.Close asChild>
+              <button
+                type="button"
+                className="console-icon-btn"
+                data-variant="ghost"
+                aria-label="Close"
+              >
+                <CloseIcon size={17} />
+              </button>
+            </RadixDialog.Close>
           </div>
 
-          <div className="flex flex-col gap-6 px-7 pb-2 pt-6">{children}</div>
+          <div className="console-sheet-body">{children}</div>
 
-          {footer ? (
-            <div
-              className="sticky bottom-0 flex items-center gap-2 px-7 py-4"
-              style={{
-                background: "var(--color-neutral-100)",
-                borderTop: "1px solid var(--color-divider)",
-              }}
-            >
-              {footer}
-            </div>
-          ) : null}
+          {footer ? <div className="console-sheet-foot">{footer}</div> : null}
         </RadixDialog.Content>
       </RadixDialog.Portal>
     </RadixDialog.Root>

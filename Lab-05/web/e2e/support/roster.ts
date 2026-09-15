@@ -17,6 +17,8 @@ export interface TestUser {
   invited_at: string | null;
   accepted_at: string | null;
   created_at: string;
+  /** Clerk's, resolved per request by the API. Null is the common case. */
+  image_url?: string | null;
 }
 
 let seq = 0;
@@ -35,6 +37,7 @@ export function user(overrides: Partial<TestUser> = {}): TestUser {
     invited_at: null,
     accepted_at: null,
     created_at: "2026-01-01T00:00:00Z",
+    image_url: null,
     ...overrides,
   };
 }
@@ -172,6 +175,127 @@ export async function mockPatchUserFieldError(
       }),
     });
   });
+}
+
+/** `PUT /api/users/{id}/countries`, capturing the body.
+ *
+ * The body is the point. The endpoint takes the COMPLETE set a person owns,
+ * not a diff, so adding one country means sending the other four back with
+ * it — and a screen that sends only the new one silently deletes the rest.
+ * Nothing on screen distinguishes the two until the roster reloads.
+ */
+export async function mockSetCountries(
+  page: Page,
+  respondWith: (countries: string[]) => TestUser,
+) {
+  const sent: string[][] = [];
+  await page.route("**/api/users/*/countries", async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    const body = route.request().postDataJSON();
+    sent.push(body.countries);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: respondWith(body.countries),
+        request_id: "req_test",
+      }),
+    });
+  });
+  return sent;
+}
+
+/** `POST /api/users/invite`, capturing what was sent.
+ *
+ * The body is the contract: an address and a role, and nothing else. The form
+ * this replaced collected ten fields and posted one of them, so "what did the
+ * submit actually send" is the assertion worth having.
+ */
+export async function mockInvite(
+  page: Page,
+  respondWith: (body: { email: string; role: string }) => TestUser,
+) {
+  const sent: { email: string; role: string }[] = [];
+  await page.route("**/api/users/invite", async (route) => {
+    const body = route.request().postDataJSON();
+    sent.push(body);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: respondWith(body),
+        request_id: "req_test",
+      }),
+    });
+  });
+  return sent;
+}
+
+/** Refuse an invitation the way the backend refuses one. */
+export async function mockInviteRefused(
+  page: Page,
+  status: number,
+  code: string,
+  message: string,
+) {
+  await page.route("**/api/users/invite", (route) =>
+    route.fulfill({
+      status,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: false,
+        error: { code, message },
+        request_id: "req_test",
+      }),
+    }),
+  );
+}
+
+export interface TestLead {
+  lead_id: string;
+  name: string | null;
+  email: string;
+  country_of_residence: string | null;
+  status: "active" | "parked" | "escalated" | "withdrawn" | "converted";
+  assigned_counsellor_id: string | null;
+  facts: Record<string, string | number>;
+  missing: string[];
+}
+
+export function lead(overrides: Partial<TestLead> = {}): TestLead {
+  seq += 1;
+  return {
+    lead_id: `lead_${String(seq).padStart(3, "0")}`,
+    name: "Ravi Menon",
+    email: `student${seq}@example.com`,
+    country_of_residence: "India",
+    status: "active",
+    assigned_counsellor_id: null,
+    facts: {},
+    missing: [],
+    ...overrides,
+  };
+}
+
+/** `GET /api/leads` — the lead book.
+ *
+ * Registered before `stubEverythingElse`'s catch-all, and Playwright tries
+ * the most recently registered route first, so call this AFTER it to win.
+ */
+export async function mockLeads(page: Page, leads: TestLead[]) {
+  await page.route("**/api/leads*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: { leads, count: leads.length },
+        request_id: "req_test",
+      }),
+    }),
+  );
 }
 
 /** The catalogue read the roster page makes to work out which destinations

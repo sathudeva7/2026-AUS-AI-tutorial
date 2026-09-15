@@ -21,13 +21,13 @@ export const usersKeys = {
  *  leads to the unassigned queue and changing their countries changes which
  *  leads they can see — so a users mutation has to invalidate a leads query.
  *
- *  **This is a no-op today, and saying so is the point.** DashboardRoute reads
- *  leads with useEffect and repo.listLeads, not through this cache, so nothing
- *  is listening on this key: the invalidation fires and no refetch happens.
+ *  **`features/leads/queries.ts` is the reader**, so these invalidations do
+ *  real work now: the Leads panel on a counsellor's record is rendered from
+ *  this key and is wrong the moment either mutation lands.
  *
- *  It stays because the requirement is real and easy to lose. When leads moves
- *  behind a query it must use THIS key, and then the two mutations that
- *  reference it start working without anyone having to remember why.
+ *  DashboardRoute still reads leads with useEffect and repo.listLeads, outside
+ *  this cache, and is still not refreshed by either. Moving it behind this key
+ *  is what finishes the job.
  *
  *  There is no `detail` key: the panel reads the person out of the list cache,
  *  so a per-user query does not exist. A key nothing reads reads as coverage

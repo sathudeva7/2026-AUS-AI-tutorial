@@ -1,541 +1,241 @@
-/** Invite a counsellor.
+/** Invite someone to this agency.
  *
- * The form is mostly routing configuration, and the copy exists to make one
- * thing unmissable: routing is explicit. Pick no destination and this person
- * is never handed a lead — the agent will not quietly give them one to
- * balance load. The summary line says exactly that while the field is empty.
+ * `POST /api/users/invite` — owner-only, and it takes an address and a role.
+ * That is the whole payload, so that is the whole form.
  *
- * Role drives the defaults (cap, escalations, permissions) rather than
- * hiding them: a junior counsellor is capped and never receives escalations,
- * and the form says why instead of silently disabling a control.
+ * What used to be here was a prototype: a full name, four invented role
+ * names, destinations, specialisations, languages, a caseload-cap slider, an
+ * escalations switch and four permission toggles. One field of the ten
+ * reached the API. The rest described a product that does not exist —
+ * `users` has no cap column, no specialisation or language columns, and
+ * permissions are a code constant plus per-user grants with no invite-time
+ * API at all. A form that collects a caseload cap and drops it on submit is
+ * worse than one that never asked.
+ *
+ * Two fields, both real:
+ *
+ *   email   the invitation is minted for this address and only the person
+ *           holding that mail can accept. There is deliberately no domain
+ *           check: small agencies run on Gmail and agencies with branches
+ *           run on several domains, and anyone able to guess an address on
+ *           the domain would be inside. Membership defines the agency
+ *           (CLAUDE.md), and Clerk's per-address invitation is what enforces
+ *           it.
+ *
+ *   role    counsellor | manager | owner, exactly as the column stores them.
+ *           The notes under each are read off permissions.py rather than
+ *           invented, because the difference between a manager and an owner
+ *           is the reason somebody is choosing.
+ *
+ * No name field. The invite knows only an address; the name arrives from
+ * Clerk when they accept, and asking for one here would collect something
+ * the request cannot carry.
+ *
+ * No countries either, though routing needs them. Ownership is a second
+ * endpoint against an id that does not exist until this call returns, and a
+ * two-call submit that half-fails leaves somebody invited with the countries
+ * silently dropped. They are assigned on the person's record once they are
+ * on the roster, where the failure has somewhere to be reported.
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
+
+import { ApiRequestError } from "@/api/errors";
 import { Dialog } from "@/components/ui/Dialog";
-import { Button, Field, Input, Kicker, Pill, Toggle } from "@/components/ui";
-import {
-  INVITE_DESTINATIONS,
-  INVITE_LANGUAGES,
-  INVITE_SPECIALISATIONS,
-} from "@/data/fixtures/counsellors";
+import { MailIcon } from "@/components/ui/icons";
+import { useInviteUser } from "@/features/users/queries";
+import type { Role } from "@/features/users/types";
 
-export interface InviteDraft {
-  name: string;
-  email: string;
-  role: RoleName;
-  destinations: string[];
-  specialisations: string[];
-  languages: string[];
-  cap: number;
-  escalations: boolean;
-  permissions: Record<PermissionKey, boolean>;
-}
-
-type RoleName =
-  "Senior counsellor" | "Counsellor" | "Junior counsellor" | "Branch manager";
-
-type PermissionKey = "transcripts" | "catalogue" | "refresh" | "keys";
-
-const ROLES: { label: RoleName; note: string }[] = [
+const ROLES: { value: Role; label: string; note: string }[] = [
   {
-    label: "Senior counsellor",
-    note: "Full routing, receives escalations, may edit the catalogue.",
-  },
-  {
+    value: "counsellor",
     label: "Counsellor",
-    note: "Full routing within their destinations and specialisations.",
+    note: "Sees the leads for countries they own, plus the unassigned queue. Reads the catalogue and can flag an entry as wrong.",
   },
   {
-    label: "Junior counsellor",
-    note: "Supervised. Caseload capped at 12, never receives escalations.",
+    value: "manager",
+    label: "Manager",
+    note: "Everything a counsellor does, across every lead in the agency. Edits and verifies the catalogue, assigns leads, and sets who owns which country.",
   },
   {
-    label: "Branch manager",
-    note: "Administration only. Excluded from the routing pool.",
+    value: "owner",
+    label: "Owner",
+    note: "Everything a manager does, plus inviting people, switching off access and the agency's own settings.",
   },
 ];
 
-const PERMISSIONS: {
-  key: PermissionKey;
-  label: string;
-  note: string;
-  locked?: boolean;
-  defaultFor: (role: RoleName) => boolean;
-}[] = [
-  {
-    key: "transcripts",
-    label: "View student transcripts",
-    note: "Full conversation history for assigned leads",
-    // Not negotiable: a counsellor cannot advise on a conversation they
-    // cannot read.
-    locked: true,
-    defaultFor: () => true,
-  },
-  {
-    key: "catalogue",
-    label: "Edit the catalogue",
-    note: "Programmes, fees, deadlines and entry requirements",
-    defaultFor: (role) =>
-      role === "Senior counsellor" || role === "Branch manager",
-  },
-  {
-    key: "refresh",
-    label: "Approve refresh items",
-    note: "Accept or reject changes the overnight job proposes",
-    defaultFor: (role) => role === "Branch manager",
-  },
-  {
-    key: "keys",
-    label: "Rotate API keys",
-    note: "Regenerate the widget key for this tenant",
-    defaultFor: (role) => role === "Branch manager",
-  },
-];
-
-function capFor(role: RoleName): number {
-  if (role === "Junior counsellor") return 12;
-  if (role === "Branch manager") return 0;
-  return 24;
+/** The API's refusals, in words that say what to do next.
+ *
+ * `code` rather than `message`: the server's prose is decent, but these three
+ * are the outcomes a person acts on differently, and the codes are the stable
+ * thing to branch on. */
+function explain(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    switch (error.code) {
+      case "ALREADY_A_MEMBER":
+        return "That address is already on your roster.";
+      case "ALREADY_INVITED":
+        // Their invitation stands; sending a second one is not the fix.
+        return "That address has already been invited. Their invitation is still valid.";
+      case "INVITE_NOT_SENT":
+        return "The invitation could not be sent. Nobody has been added — try again in a moment.";
+    }
+  }
+  return (error as Error).message;
 }
 
 export function InviteDialog({
   open,
   onOpenChange,
-  onInvite,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onInvite: (draft: InviteDraft) => void;
 }) {
-  const [name, setName] = useState("");
+  const invite = useInviteUser();
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<RoleName>("Counsellor");
-  const [destinations, setDestinations] = useState<string[]>([]);
-  const [specialisations, setSpecialisations] = useState<string[]>([]);
-  const [languages, setLanguages] = useState<string[]>([]);
-  const [cap, setCap] = useState<number | null>(null);
-  const [escalations, setEscalations] = useState(false);
-  const [perms, setPerms] = useState<Partial<Record<PermissionKey, boolean>>>(
-    {},
-  );
+  const [role, setRole] = useState<Role>("counsellor");
+  const [error, setError] = useState<string | null>(null);
+  /** The address the last successful invitation went to. Shown instead of
+   *  closing the sheet: an agency onboarding a branch invites four people in
+   *  a row, and a dialog that shuts after each one makes that four trips. */
+  const [sent, setSent] = useState<string | null>(null);
 
-  const effectiveCap = cap ?? capFor(role);
-  // A junior counsellor never receives escalations, whatever the toggle says.
-  const effectiveEscalations =
-    role === "Junior counsellor" ? false : escalations;
-  const adminOnly = role === "Branch manager";
-
-  // The domain check that used to live here is gone, and deliberately.
-  //
-  // It refused any address outside the tenant's own domain, which breaks the
-  // customers this product is for: small agencies run on Gmail, and an agency
-  // with branches in two countries has two domains. It was also a weak
-  // control — anyone who could guess an address on the domain was inside.
-  //
-  // Clerk's invitation replaces it and is strictly stronger: the invitation
-  // is minted for ONE address, delivered to it, and only the person holding
-  // that mail can accept. Membership, not domain, is what makes someone part
-  // of the agency.
+  const trimmed = email.trim();
   const emailBad =
-    email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const ready =
-    name.trim().length > 2 &&
-    !emailBad &&
-    email.length > 0 &&
-    (destinations.length > 0 || adminOnly);
+    trimmed.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+  const ready = trimmed.length > 0 && !emailBad && !invite.isPending;
 
-  const summary = useMemo(() => {
-    if (adminOnly) {
-      return "Administrative account — excluded from routing, so no destinations are needed.";
-    }
-    if (!destinations.length) {
-      return "Select at least one destination, or this counsellor will never be routed a lead. The agent does not round-robin to fill a gap.";
-    }
-    return (
-      `Routed leads for ${destinations.join(", ")} · cap ${effectiveCap}` +
-      (effectiveEscalations ? " · receives escalations" : "")
-    );
-  }, [adminOnly, destinations, effectiveCap, effectiveEscalations]);
-
-  function toggle(list: string[], value: string): string[] {
-    return list.includes(value)
-      ? list.filter((v) => v !== value)
-      : [...list, value];
-  }
-
-  function selectRole(next: RoleName) {
-    setRole(next);
-    setCap(null);
-    setEscalations(next === "Senior counsellor");
-    setPerms({});
-  }
-
-  function send() {
-    if (!ready) return;
-    onInvite({
-      name: name.trim(),
-      email,
-      role,
-      destinations,
-      specialisations,
-      languages,
-      cap: effectiveCap,
-      escalations: effectiveEscalations,
-      permissions: Object.fromEntries(
-        PERMISSIONS.map((p) => [
-          p.key,
-          p.locked ? true : (perms[p.key] ?? p.defaultFor(role)),
-        ]),
-      ) as Record<PermissionKey, boolean>,
-    });
-    setName("");
+  function close() {
+    onOpenChange(false);
+    // Reset on the way out, not on the way in: reopening should not be
+    // holding the last person's address, and clearing here keeps the sheet
+    // from flickering blank as it animates away.
     setEmail("");
-    setDestinations([]);
-    setSpecialisations([]);
-    setLanguages([]);
-    setCap(null);
-    setPerms({});
+    setRole("counsellor");
+    setError(null);
+    setSent(null);
+  }
+
+  async function send() {
+    if (!ready) return;
+    setError(null);
+    try {
+      await invite.mutateAsync({ email: trimmed, role });
+      setSent(trimmed);
+      setEmail("");
+    } catch (e: unknown) {
+      setSent(null);
+      setError(explain(e));
+    }
   }
 
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
       title="Invite a counsellor"
-      description="They receive an email invitation. Nothing is routed to them until they accept and set their availability."
+      description="They get an email invitation. Nothing is routed to them until they accept, and not then either until somebody gives them a country."
       footer={
         <>
-          <span
-            className="flex-1 text-[12.5px]"
-            style={{ color: "var(--color-neutral-700)" }}
+          <button
+            type="button"
+            className="console-btn"
+            data-variant="secondary"
+            onClick={close}
           >
-            {summary}
-          </span>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
+            {sent ? "Done" : "Cancel"}
+          </button>
+          <button
+            type="button"
+            className="console-btn"
+            data-variant="primary"
             onClick={send}
             disabled={!ready}
-            aria-disabled={!ready}
           >
-            Send invitation
-          </Button>
+            {invite.isPending ? "Sending…" : "Send invitation"}
+          </button>
         </>
       }
     >
-      <Steps />
-
-      <section>
-        <Kicker>Identity</Kicker>
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          <Field label="Full name" htmlFor="invite-name">
-            <Input
-              id="invite-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
-          <Field label="Work email" htmlFor="invite-email">
-            <Input
-              id="invite-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              aria-invalid={emailBad || undefined}
-            />
-          </Field>
-        </div>
-        <div
-          className="mt-2 text-[11.5px]"
-          style={{
-            color: emailBad
-              ? "var(--color-accent-800)"
-              : "var(--color-neutral-700)",
+      <div>
+        <label className="console-label" htmlFor="invite-email">
+          Work email
+        </label>
+        <input
+          id="invite-email"
+          className="console-input max-w-[420px]"
+          type="email"
+          value={email}
+          placeholder="name@agency.com"
+          autoComplete="off"
+          disabled={invite.isPending}
+          aria-invalid={emailBad || undefined}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError(null);
           }}
-        >
-          {emailBad
-            ? "That does not look like an email address."
-            : "The invitation is sent to this address, and only the person who receives it can accept."}
-        </div>
-      </section>
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void send();
+          }}
+        />
+        {emailBad ? (
+          <p className="console-error" role="alert">
+            That does not look like an email address.
+          </p>
+        ) : (
+          <p className="console-hint">
+            The invitation is minted for this address, and only the person who
+            receives it can accept.
+          </p>
+        )}
+      </div>
 
-      <section>
-        <Kicker>Role</Kicker>
+      <div>
+        <div className="console-label">Role</div>
         <div
-          className="mt-2 flex flex-col gap-2"
+          className="flex flex-col gap-2"
           role="radiogroup"
           aria-label="Role"
         >
-          {ROLES.map((option) => {
-            const on = role === option.label;
-            return (
-              <button
-                key={option.label}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => selectRole(option.label)}
-                className="flex cursor-pointer gap-3 rounded-md border p-3 text-left font-body"
-                style={{
-                  background: on
-                    ? "var(--color-accent-2-100)"
-                    : "var(--color-neutral-100)",
-                  borderColor: on
-                    ? "var(--color-accent-2-500)"
-                    : "var(--color-divider)",
-                }}
-              >
-                <span
-                  className="mt-0.5 h-4 w-4 flex-none rounded-pill border-2"
-                  style={{
-                    background: on
-                      ? "var(--color-accent-2-600)"
-                      : "transparent",
-                    borderColor: on
-                      ? "var(--color-accent-2-600)"
-                      : "var(--color-neutral-400)",
-                  }}
-                  aria-hidden="true"
-                />
-                <span className="flex-1">
-                  <span className="block text-[13.5px] font-semibold">
-                    {option.label}
-                  </span>
-                  <span
-                    className="mt-0.5 block text-[12px]"
-                    style={{ color: "var(--color-neutral-700)" }}
-                  >
-                    {option.note}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section>
-        <Kicker>Routing</Kicker>
-        <p
-          className="mb-3 mt-2 max-w-[70ch] text-[12.5px]"
-          style={{ color: "var(--color-neutral-700)" }}
-        >
-          The agent routes a lead to the first counsellor matching every rule
-          with capacity left. A destination with no active owner sends leads to
-          the unassigned queue — it never picks someone else to fill the gap.
-        </p>
-
-        <PillGroup
-          label="Destinations"
-          options={INVITE_DESTINATIONS}
-          selected={destinations}
-          onToggle={(v) => setDestinations((s) => toggle(s, v))}
-          disabled={adminOnly}
-        />
-        <PillGroup
-          label="Specialisations"
-          options={INVITE_SPECIALISATIONS}
-          selected={specialisations}
-          onToggle={(v) => setSpecialisations((s) => toggle(s, v))}
-        />
-        <PillGroup
-          label="Languages"
-          options={INVITE_LANGUAGES}
-          selected={languages}
-          onToggle={(v) => setLanguages((s) => toggle(s, v))}
-        />
-      </section>
-
-      <section>
-        <Kicker>Capacity &amp; escalations</Kicker>
-        <div className="mb-1.5 mt-2 flex items-center gap-3.5">
-          <label
-            htmlFor="invite-cap"
-            className="w-[150px] flex-none text-[13px]"
-          >
-            Active caseload cap
-          </label>
-          <input
-            id="invite-cap"
-            type="range"
-            className="nb-range"
-            min={0}
-            max={40}
-            step={1}
-            value={effectiveCap}
-            onChange={(e) => setCap(Number(e.target.value))}
-          />
-          <span className="figure w-[76px] text-right text-[12.5px]">
-            {effectiveCap} leads
-          </span>
-        </div>
-        <p
-          className="mb-3.5 mt-0 text-[11.5px]"
-          style={{ color: "var(--color-neutral-700)" }}
-        >
-          {role === "Junior counsellor"
-            ? "Junior counsellors are capped at 12 while supervised — the agent stops routing above the cap."
-            : "The agent stops routing to this counsellor once their active caseload reaches the cap."}
-        </p>
-
-        <div
-          className="flex items-start gap-3 rounded-md border p-3"
-          style={{
-            background: effectiveEscalations
-              ? "var(--color-accent-2-100)"
-              : "var(--color-neutral-100)",
-            borderColor: effectiveEscalations
-              ? "var(--color-accent-2-500)"
-              : "var(--color-divider)",
-          }}
-        >
-          <Toggle
-            on={effectiveEscalations}
-            onToggle={() => setEscalations((e) => !e)}
-            label="Receive escalated leads"
-            locked={role === "Junior counsellor"}
-          />
-          <span className="flex-1">
-            <span className="block text-[13.5px] font-semibold">
-              Receive escalated leads
-            </span>
-            <span
-              className="mt-0.5 block text-[12px]"
-              style={{ color: "var(--color-neutral-700)" }}
+          {ROLES.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={role === option.value}
+              disabled={invite.isPending}
+              className="console-choice"
+              onClick={() => setRole(option.value)}
             >
-              {role === "Junior counsellor"
-                ? "Unavailable for junior counsellors. A declared visa refusal always routes to a senior counsellor."
-                : "Leads that trip an escalation trigger — a declared refusal, a fee dispute, a request for a person — stop the agent and route here."}
-            </span>
-          </span>
+              <span className="console-choice-dot" aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="console-choice-label">{option.label}</span>
+                <span className="console-choice-note">{option.note}</span>
+              </span>
+            </button>
+          ))}
         </div>
-      </section>
-
-      <section>
-        <Kicker>Permissions</Kicker>
-        <div className="mt-2 flex flex-col gap-2">
-          {PERMISSIONS.map((permission) => {
-            const on = permission.locked
-              ? true
-              : (perms[permission.key] ?? permission.defaultFor(role));
-            return (
-              <div
-                key={permission.key}
-                className="flex items-center gap-3 rounded-md px-3.5 py-[11px]"
-                style={{ background: "var(--color-neutral-100)" }}
-              >
-                <span className="flex-1">
-                  <span className="block text-[13px]">{permission.label}</span>
-                  <span
-                    className="block text-[11.5px]"
-                    style={{ color: "var(--color-neutral-700)" }}
-                  >
-                    {permission.note}
-                  </span>
-                </span>
-                <Toggle
-                  on={on}
-                  locked={permission.locked}
-                  label={permission.label}
-                  onToggle={() =>
-                    setPerms((p) => ({ ...p, [permission.key]: !on }))
-                  }
-                />
-              </div>
-            );
-          })}
-        </div>
-        <p
-          className="m-0 mt-2.5 text-[11.5px]"
-          style={{ color: "var(--color-neutral-700)" }}
-        >
-          {adminOnly
-            ? "Branch managers hold every permission and are excluded from the routing pool."
-            : "Transcript access is always on — a counsellor cannot advise on a conversation they cannot read."}
+        <p className="console-hint">
+          A role can be changed later. Owner includes inviting and switching
+          off other people, so it is the one worth a second thought.
         </p>
-      </section>
+      </div>
+
+      {error ? (
+        <p className="console-error m-0" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {sent ? (
+        <div className="console-sent" role="status">
+          <MailIcon size={17} className="console-sent-icon" />
+          <span>
+            Invitation sent to <strong>{sent}</strong>. They appear on the
+            roster as invited until they accept. Invite someone else, or close
+            this.
+          </span>
+        </div>
+      ) : null}
     </Dialog>
-  );
-}
-
-function Steps() {
-  const steps = [
-    { n: "1", label: "Details", active: true },
-    { n: "2", label: "They accept", active: false },
-    { n: "3", label: "They set availability", active: false },
-  ];
-  return (
-    <ol className="m-0 flex list-none items-center gap-4 p-0">
-      {steps.map((step) => (
-        <li key={step.n} className="flex items-center gap-2">
-          <span
-            className="grid h-[22px] w-[22px] place-items-center rounded-pill text-[11px]"
-            style={{
-              background: step.active
-                ? "var(--color-accent)"
-                : "var(--color-neutral-300)",
-              color: step.active
-                ? "var(--color-bg)"
-                : "var(--color-neutral-900)",
-            }}
-          >
-            {step.n}
-          </span>
-          <span
-            className="text-[12.5px]"
-            style={{
-              color: step.active
-                ? "var(--color-text)"
-                : "var(--color-neutral-700)",
-            }}
-          >
-            {step.label}
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function PillGroup({
-  label,
-  options,
-  selected,
-  onToggle,
-  disabled,
-}: {
-  label: string;
-  options: string[];
-  selected: string[];
-  onToggle: (value: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="mb-4">
-      <div
-        className="mb-[7px] text-[12px]"
-        style={{ color: "var(--color-neutral-700)" }}
-        id={`group-${label}`}
-      >
-        {label}
-      </div>
-      <div
-        className="flex flex-wrap gap-[7px]"
-        role="group"
-        aria-labelledby={`group-${label}`}
-      >
-        {options.map((option) => (
-          <Pill
-            key={option}
-            role="checkbox"
-            label={option}
-            selected={selected.includes(option)}
-            disabled={disabled}
-            onClick={() => onToggle(option)}
-          />
-        ))}
-      </div>
-    </div>
   );
 }

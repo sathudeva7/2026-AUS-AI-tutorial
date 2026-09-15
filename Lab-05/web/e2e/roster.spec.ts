@@ -151,9 +151,52 @@ test("someone owning no countries is told what that means", async ({
 
   // Specific to the detail card: "unassigned queue" also appears in the banner
   // about destinations nobody owns, and a locator matching both is ambiguous.
+  // The empty state is a titled box now rather than one sentence, so the
+  // heading and the consequence are asserted separately — the consequence is
+  // the half that matters and the half that is easy to lose in a redesign.
+  await expect(page.getByText("No countries assigned")).toBeVisible();
   await expect(
-    page.getByText(/No countries\. Leads for a destination nobody owns/),
+    page.getByText(/Leads for a destination nobody owns join the unassigned/),
   ).toBeVisible();
+});
+
+test("countries read as names, not as codes", async ({ page }) => {
+  // The code is what the column stores and what the write sends; nobody reads
+  // "LK" and thinks Sri Lanka on the first pass, and a roster is read far more
+  // often than it is edited.
+  await mockRoster(page, [
+    user({ name: "Anita Silva", countries: ["LK", "AU"] }),
+  ]);
+
+  await page.goto("/counsellors");
+
+  await expect(page.getByText("Covers Sri Lanka, Australia.")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Anita Silva/ }),
+  ).toContainText("Sri Lanka, Australia");
+});
+
+test("owning GB covers the catalogue's \"UK\"", async ({ page }) => {
+  // The catalogue writes "UK"; users own ISO codes, where Britain is GB. That
+  // is two letters, so a `/^[A-Za-z]{2}$/` shortcut used to return it
+  // unchanged and skip the alias written for it — leaving the banner
+  // reporting Britain as unowned however many people owned GB. The alarm this
+  // screen exists to raise, stuck permanently on.
+  await mockRoster(page, [user({ name: "Anita Silva", countries: ["GB"] })]);
+
+  await page.goto("/counsellors");
+
+  // Wait for the banner to actually render before asserting what is NOT in
+  // it. The catalogue read is async, and a toHaveCount(0) that runs first
+  // passes against an empty page — which is how this test passed against the
+  // bug it was written for.
+  const banner = page.getByText(/countries have no owner/);
+  await expect(banner).toBeVisible();
+
+  // The seed catalogue covers the UK, Australia, Canada and Germany. Owning
+  // GB must leave three gaps, not four.
+  await expect(page.getByText("3 countries have no owner")).toBeVisible();
+  await expect(page.getByText(/^UK$/)).toHaveCount(0);
 });
 
 test("a person's own timezone is shown, not the viewer's", async ({ page }) => {

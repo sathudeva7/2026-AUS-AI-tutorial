@@ -3,7 +3,7 @@
  * Pure functions, kept out of the component so they can be reasoned about —
  * and tested — without a browser.
  */
-import { COUNTRIES } from "@/data/countries";
+import { COUNTRY_BY_CODE } from "@/data/countries";
 
 import type { User } from "./types";
 
@@ -38,6 +38,25 @@ export const STATUS_LABEL: Record<User["status"], string> = {
   deactivated: "Deactivated",
 };
 
+/** An owned country as a person reads it.
+ *
+ * The code is the unit everything else works in — it is what the column
+ * stores, what `PUT /api/users/{id}/countries` takes and what the search box
+ * matches — but nobody reads "LK" and thinks Sri Lanka on the first pass, and
+ * a roster is read far more often than it is edited.
+ *
+ * An unknown code passes through unchanged rather than being dropped or
+ * rendered as a dash. A country this build has never heard of is still a
+ * country somebody owns, and hiding it would hide the coverage with it.
+ */
+export function countryName(code: string): string {
+  return COUNTRY_BY_CODE[code]?.name ?? code;
+}
+
+export function countryNames(codes: string[]): string {
+  return codes.map(countryName).join(", ");
+}
+
 /** What this person covers, for the line under their name.
  *
  * Countries rather than a caseload figure. The prototype showed "8 / 20 leads"
@@ -53,32 +72,7 @@ export function coverage(user: User): { role: string; countries: string } {
   return {
     role: ROLE_LABEL[user.role],
     countries: user.countries.length
-      ? user.countries.join(", ")
+      ? countryNames(user.countries)
       : "No countries",
   };
-}
-
-/** The catalogue names a country ("Australia", "UK"); a user owns a code
- *  ("AU", "GB"). Comparing the two directly never matches, so every catalogued
- *  destination reads as unowned even when somebody owns it — the alarm this
- *  screen exists to raise, stuck permanently on.
- *
- *  Aliases cover the names the catalogue uses that are not the official ones.
- *  Fixture-only: `programmes` has no live endpoint yet, and when it gets one it
- *  should return codes so this can go.
- */
-const CODE_BY_NAME: Record<string, string> = {
-  ...Object.fromEntries(COUNTRIES.map((c) => [c.name.toLowerCase(), c.code])),
-  uk: "GB",
-  usa: "US",
-  "united states of america": "US",
-};
-
-/** A catalogue country name as an ISO code, or the input unchanged when it is
- *  already one. Unknown names pass through so they still show as a gap rather
- *  than vanishing — an uncatalogued destination nobody owns is worth seeing. */
-export function toCountryCode(nameOrCode: string): string {
-  const trimmed = nameOrCode.trim();
-  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
-  return CODE_BY_NAME[trimmed.toLowerCase()] ?? trimmed;
 }

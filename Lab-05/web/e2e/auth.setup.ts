@@ -102,9 +102,9 @@ setup("sign in", async ({ page }) => {
   // Waiting for something only the protected page renders is the check that
   // actually tells the two apart.
   await page.goto("/counsellors");
-  await expect(page.getByRole("heading", { name: "Counsellors" })).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(
+    page.getByRole("heading", { name: "Counsellor roster" }),
+  ).toBeVisible({ timeout: 15_000 });
 
   await page.context().storageState({ path: SESSION_FILE });
 });

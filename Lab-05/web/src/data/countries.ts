@@ -299,3 +299,44 @@ export const COUNTRIES: Country[] = [
 export const COUNTRY_BY_CODE: Record<string, Country> = Object.fromEntries(
   COUNTRIES.map((c) => [c.code, c]),
 );
+
+/** The catalogue names a country ("Australia", "UK"); a user owns a code
+ *  ("AU", "GB"). Comparing the two directly never matches, so every catalogued
+ *  destination reads as unowned even when somebody owns it — the alarm this
+ *  screen exists to raise, stuck permanently on.
+ *
+ *  Aliases cover the names the catalogue uses that are not the official ones.
+ *  Fixture-only: `programmes` has no live endpoint yet, and when it gets one it
+ *  should return codes so this can go.
+ */
+const CODE_BY_NAME: Record<string, string> = {
+  ...Object.fromEntries(COUNTRIES.map((c) => [c.name.toLowerCase(), c.code])),
+  uk: "GB",
+  usa: "US",
+  "united states of america": "US",
+};
+
+/** A catalogue country name as an ISO code, or the input unchanged when it is
+ *  already one. Unknown names pass through so they still show as a gap rather
+ *  than vanishing — an uncatalogued destination nobody owns is worth seeing.
+ *
+ *  The alias table is consulted FIRST, and that order is the whole point.
+ *  "UK" is two letters, so a leading `/^[A-Za-z]{2}$/` shortcut treats it as
+ *  an ISO code and hands back "UK" — which is not one; Britain is GB. The
+ *  `uk: "GB"` alias below was written for exactly this input and the shortcut
+ *  made it unreachable, so a counsellor owning GB never matched the
+ *  catalogue's "UK" and the coverage banner reported Britain as unowned
+ *  forever. That is the alarm this screen exists to raise, stuck permanently
+ *  on — the failure described at the top of this block, caused by the code
+ *  meant to prevent it.
+ *
+ *  Safe in this order: every alias key is either a full country name or a
+ *  known abbreviation, and no ISO alpha-2 code is a country's whole name, so
+ *  a real two-letter code never collides with one. */
+export function toCountryCode(nameOrCode: string): string {
+  const trimmed = nameOrCode.trim();
+  const alias = CODE_BY_NAME[trimmed.toLowerCase()];
+  if (alias) return alias;
+  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  return trimmed;
+}

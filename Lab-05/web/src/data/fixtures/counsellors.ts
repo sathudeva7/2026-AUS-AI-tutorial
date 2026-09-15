@@ -251,34 +251,3 @@ export const PROFILES: Record<string, CounsellorProfile> = {
     assigned: [],
   },
 };
-
-/** Destinations, specialisations and languages the invite form offers.
- *  Destinations are the countries the catalogue actually covers plus the
- *  ones already owned, so inviting someone for a country with no programmes
- *  is visible as such. */
-export const INVITE_DESTINATIONS = [
-  "UK",
-  "Ireland",
-  "Australia",
-  "New Zealand",
-  "Canada",
-  "Germany",
-  "Netherlands",
-];
-
-export const INVITE_SPECIALISATIONS = [
-  "Postgraduate",
-  "Undergraduate",
-  "Data & computing",
-  "Business & management",
-  "Engineering",
-  "Medicine & public health",
-];
-
-export const INVITE_LANGUAGES = [
-  "English",
-  "Tamil",
-  "Mandarin",
-  "German",
-  "Spanish",
-];

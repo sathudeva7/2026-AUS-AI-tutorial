@@ -3,17 +3,33 @@
  * `PATCH /api/users/{id}` — name and work phone. Timezone is displayed but not
  * editable yet; it gets its own step alongside the availability grid, because
  * changing a zone reinterprets every hour already stored against it.
+ *
+ * Owned countries sit at the bottom of this card rather than in a card of
+ * their own. They are one more field of one person's record, and giving them
+ * a panel beside this one made the layout the subject — two headed boxes of
+ * unequal height for four fields and a row of two-letter chips.
+ *
+ * They are OUTSIDE the view/form swap on purpose. Countries are written by a
+ * different endpoint under a different permission, so they are editable while
+ * the name and phone are not, and they must not vanish from the card just
+ * because somebody opened the name field.
+ *
+ * `editing` is owned by the panel above rather than by this card, because the
+ * profile header carries an Edit button too and two components each holding
+ * their own copy of one boolean is how you get a header saying "Edit" above a
+ * card that is already open.
  */
 import { useState } from "react";
 
 import { FieldValidationError } from "@/api/errors";
 import { Select, type SelectOption } from "@/components/ui/Select";
 import { COUNTRIES } from "@/data/countries";
-import { useSession } from "@/data/SessionProvider";
 
 import { usePatchUser } from "../queries";
 import { composeE164, splitE164 } from "../phone";
 import type { User } from "../types";
+import { CountriesField } from "./CountriesField";
+import { ClockIcon, MailIcon, PersonIcon, PhoneIcon } from "@/components/ui/icons";
 
 const DIAL_OPTIONS: SelectOption[] = COUNTRIES.map((c) => ({
   value: c.code,
@@ -21,39 +37,45 @@ const DIAL_OPTIONS: SelectOption[] = COUNTRIES.map((c) => ({
   hint: c.name,
 }));
 
-export function ContactCard({ user }: { user: User }) {
-  const { session, can } = useSession();
-  const [editing, setEditing] = useState(false);
-
-  // Self, or users.edit. The same rule the endpoint enforces — everyone may
-  // edit their own row, which is why this is not a plain permission check.
-  //
-  // This is UX, not security: the backend re-checks, and a hidden button is
-  // not a permission.
-  const mayEdit = can("users.edit") || session?.user_id === user.id;
-
+export function ContactCard({
+  user,
+  editing,
+  onDone,
+}: {
+  user: User;
+  /** Held by the panel above — see UserDetail. */
+  editing: boolean;
+  onDone: () => void;
+}) {
   return (
     <section className="console-card">
       <div className="console-card-head">
-        <h3 className="console-section-title">Contact</h3>
-        {mayEdit && !editing ? (
-          <button
-            type="button"
-            className="console-btn"
-            data-variant="secondary"
-            onClick={() => setEditing(true)}
-          >
-            Edit
-          </button>
-        ) : null}
+        <h3 className="console-section-title">
+          <span className="inline-flex items-center gap-2">
+            <PersonIcon size={17} />
+            Contact information
+          </span>
+        </h3>
+        {/* No Edit button here, unlike the reference design.
+            Name and work phone are the ONLY things about a person this panel
+            can edit, so a button on this card and a button in the header
+            would open the same form — two controls, one action, and a
+            "which one do I press" the screen cannot answer. The header's is
+            the one kept, because it is where the design puts the emphasis and
+            because it is reachable without scrolling past the tiles.
+            When there is a second editable group up here, this comes back. */}
       </div>
 
       <div className="console-card-body">
         {editing ? (
-          <ContactForm user={user} onDone={() => setEditing(false)} />
+          <ContactForm user={user} onDone={onDone} />
         ) : (
           <ContactView user={user} />
         )}
+
+        <div className="console-card-split">
+          <CountriesField user={user} />
+        </div>
       </div>
     </section>
   );
@@ -61,21 +83,33 @@ export function ContactCard({ user }: { user: User }) {
 
 function ContactView({ user }: { user: User }) {
   return (
-    <dl className="console-dl">
-      <dt>Name</dt>
+    <dl className="console-dl" data-variant="icons">
+      <dt>
+        <PersonIcon className="console-dl-icon" />
+        Name
+      </dt>
       <dd>{user.name ?? "Not set"}</dd>
 
-      <dt>Email</dt>
+      <dt>
+        <MailIcon className="console-dl-icon" />
+        Email
+      </dt>
       {/* Identity, and not editable here: it is the link to Clerk and the
           address an invitation was accepted on. */}
       <dd>{user.email}</dd>
 
-      <dt>Work phone</dt>
+      <dt>
+        <PhoneIcon className="console-dl-icon" />
+        Work phone
+      </dt>
       {/* A product contact, not HR: the number a colleague rings about an
           escalation, which is why every member can see it. */}
       <dd>{user.work_phone ?? "Not given"}</dd>
 
-      <dt>Timezone</dt>
+      <dt>
+        <ClockIcon className="console-dl-icon" />
+        Timezone
+      </dt>
       {/* Their zone, not the viewer's. Availability is wall clock read against
           this, so it is a working fact rather than trivia. */}
       <dd>{user.timezone}</dd>
