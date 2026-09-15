@@ -1,6 +1,6 @@
 # Northbound — data model (1: people and access)
 
-> Part 1 — people and access (below) · [Part 2 — leads and facts](#northbound--data-model-2-leads-and-facts) · [Part 3 — meetings](#northbound--data-model-3-meetings)
+> Part 1 — people and access (below) · [Part 2 — leads and facts](#northbound--data-model-2-leads-and-facts) · [Part 3 — meetings](#northbound--data-model-3-meetings) · [Part 4 — the catalogue](#northbound--data-model-4-the-catalogue)
 
 Who works at an agency, what they may do, and when they are reachable. The
 lead record is part 2; catalogue and audit tables come later.
@@ -649,7 +649,7 @@ the absence of a row, which is what absence honestly means.
 
 # Northbound — data model (3: meetings)
 
-> [Part 1 — people and access](#northbound--data-model-1-people-and-access) · [Part 2 — leads and facts](#northbound--data-model-2-leads-and-facts) · Part 3 — meetings (below)
+> [Part 1 — people and access](#northbound--data-model-1-people-and-access) · [Part 2 — leads and facts](#northbound--data-model-2-leads-and-facts) · Part 3 — meetings (below) · [Part 4 — the catalogue](#northbound--data-model-4-the-catalogue)
 
 A booked consultation between one student and one counsellor. Migration `004`
 creates `meetings` and enables `btree_gist`.
@@ -809,3 +809,218 @@ three `RESTRICT` edges to `users` — `user_id`, `created_by` and `cancelled_by`
 
 Skipping this table makes `delete from tenants` fail. That is the intended loud
 failure, but only for someone who knows to look here.
+
+---
+
+# Northbound — data model (4: the catalogue)
+
+> [Part 1 — people and access](#northbound--data-model-1-people-and-access) · [Part 2 — leads and facts](#northbound--data-model-2-leads-and-facts) · [Part 3 — meetings](#northbound--data-model-3-meetings) · Part 4 — the catalogue (below)
+
+What this consultancy has **checked**: institutions, programmes, the intakes
+they open for and the entry requirements they set. Migration `005` creates
+`institutions`, `programmes`, `programme_intakes` and `programme_requirements`.
+
+Until now the catalogue existed twice, and neither copy was a table.
+`mocks/seeds/programmes.json` is what the agent reads — fifteen rows, one flat
+dict, no `tenant_id` anywhere, so every agency shares one catalogue. A
+TypeScript fixture with a session overlay is what the console edits. **Editing
+a programme could not change what a student was told.** This is the table both
+of those become.
+
+```mermaid
+erDiagram
+    tenants     ||--o{ institutions : "maintains"
+    tenants     ||--o{ programmes : "owns"
+    institutions ||--o{ programmes : "offers"
+    programmes  ||--o{ programme_intakes : "opens for"
+    programmes  ||--o{ programme_requirements : "demands"
+    users       ||--o{ programmes : "verifies"
+
+    institutions {
+        uuid id PK
+        text tenant_id FK
+        text name "unique per tenant, case-insensitively"
+        char country "ISO 3166-1 alpha-2"
+        text website
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    programmes {
+        uuid id PK
+        text tenant_id FK
+        uuid institution_id FK
+        text name
+        text level "lowercase; NOT a closed set"
+        text field
+        char country "the OFFERING's country, not the institution's"
+        text city
+        bigint tuition_per_year_minor "minor units, never a float"
+        char currency "ISO 4217; the programme's own"
+        int duration_months
+        text status "draft, published, archived - never deleted"
+        timestamptz verified_at "null = never checked, not an old date"
+        uuid verified_by FK "a users row, so a PERSON"
+        uuid created_by FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    programme_intakes {
+        uuid id PK
+        text tenant_id FK
+        uuid programme_id FK
+        char intake "YYYY-MM"
+        date application_deadline "PER intake"
+        boolean is_open
+        timestamptz created_at
+    }
+
+    programme_requirements {
+        uuid id PK
+        text tenant_id FK
+        uuid programme_id FK
+        text fact_key "the same seven as lead_facts"
+        text rule "evaluated in code, not constrained here"
+        text description "what the student is told"
+        boolean mandatory
+        smallint sort_order
+        timestamptz created_at
+    }
+```
+
+## A programme is not visible until a person has verified it
+
+`search_programmes` may only read `status = 'published'`, so publishing **is**
+the act of making a figure quotable to a student. Two CHECK constraints stand
+between a row and that:
+
+```sql
+check (status <> 'published' or verified_at is not null)   -- and verified_at
+check ((verified_at is null) = (verified_by is null))      -- needs a users row
+```
+
+Follow the chain: published needs `verified_at`, `verified_at` needs
+`verified_by`, and `verified_by` is a foreign key into `users`. **Nothing that
+is not a member of this agency can publish a programme.** An import script, an
+overnight refresh job and `006`'s AI extraction pipeline are all equally
+refused — not by a permission check they might be written to skip, but by the
+database.
+
+This is the product's central promise — *the agent may not state a fee from
+its own knowledge* — moved out of a prompt instruction and into a constraint.
+It is the reason this migration exists in the shape it does.
+
+The second half is `programmes_published_is_complete`: a published row must
+have an institution, level, field, country, price and duration. A student
+asking "how much, how long?" about a live programme gets an answer or the row
+should not be live. Every one of those columns stays nullable for a draft —
+which is exactly what a half-finished extraction produces — and becomes
+mandatory at the moment the row starts being read.
+
+## Each intake carries its own deadline
+
+The model this replaces had one `application_deadline` for every intake a
+programme offered. January and September close **months** apart, so a single
+column means the agent quotes the wrong date to whichever half of the students
+it was not written for.
+
+The freshness queue already knew this. Its fixture raises "Application
+deadline · 2027-09 intake" — against a shape with nowhere to put it.
+
+A closed intake is kept rather than deleted: "you have missed this one, the
+next is January" is an answer, and history nobody can see gets re-researched.
+
+## Archived, never deleted
+
+The console has a Delete button. Past `tool_calls` rows name the
+`programme_id` the agent returned, and the dashboard rebuilds shortlists from
+them — CLAUDE.md's *everything is reconstructable*. A hard delete turns a
+completed shortlist into a dangling reference to explain later.
+
+`status = 'archived'` keeps the history and gets the row out of the table, and
+the partial index on `status = 'published'` means archived rows cost the agent's
+query nothing.
+
+## Enforced by the database, not by discipline
+
+- **A published programme was verified by a person.** The chain above.
+- **A price is an amount AND a currency.** `24500` with no currency is not a
+  cheaper programme, it is an unanswerable question.
+- **The verification stamp and the person who made it cannot disagree.** The
+  same pairing `meetings` uses for its `cancelled_*` trio.
+- **A requirement names one of the seven fact keys.** The same CHECK as
+  `lead_facts`, and `db/tests/test_catalogue.py` reads both out of
+  `pg_constraint` and asserts they have not drifted. A requirement keyed to
+  something that is not a fact is legal to write and impossible to evaluate.
+- **One university per tenant, case-insensitively.** The whole point of
+  splitting `institutions` out was to stop one university being typed fifteen
+  ways.
+- **An intake is a month.** `'2027-9'` and `'2027-13'` are the two ways a
+  typed or extracted intake goes wrong, and both silently never match.
+- **`level` is lowercase.** `search_programmes` matches it exactly, so
+  `"Masters"` that never matches `"masters"` is a programme that cannot be
+  found.
+
+## Rules no constraint can express
+
+**A country code is real.** The CHECK is shape only — `'UK'` and `'XX'` are
+both two uppercase letters and neither is a country. ISO 3166 lives in
+`services/geo.normalise_country`, which every write path must go through, for
+the reason `001` already settled for `tenants.country`: a copy of the register
+in a CHECK would be a third list to hold in step, updatable only by a
+migration whenever the world changes.
+
+This one is not theoretical. The seed catalogue writes `"UK"` while
+`user_countries` stores `GB`, and because both are two letters a shortcut in
+the frontend passed it straight through — leaving the coverage banner
+reporting Britain permanently unowned however many counsellors owned it. The
+alarm that screen exists to raise, stuck on.
+
+**A rule is evaluable.** `rule` holds machine text like
+`bachelor_years>=4`, and the grammar lives in the evaluator. A regex here
+would be the same rule stated twice in a language that cannot run it — the
+reasoning `lead_facts.value` already uses. The write path validates against
+the evaluator itself, because **a rule nothing evaluates is an entry
+requirement that silently never fires**, which is worse than no requirement:
+the row looks complete.
+
+**`level` is open text.** Deliberately, unlike `status` and `fact_key`. An
+agency's "integrated masters", "top-up" or "pathway" year is a real programme,
+and refusing to store one because this list was written without it is worse
+than a slug in a column the console already handles — `levelLabel` passes an
+unrecognised value through rather than blanking it.
+
+## Deliberately absent
+
+**No revision history.** "What fee were we quoting in August?" is already
+answerable: `tool_calls` records what `search_programmes` returned, with its
+timestamp. A second history would be a second source of truth for one
+question, and the two would disagree the first time a backfill ran.
+
+**No per-tenant staleness setting.** "Stale after 30 days" is one constant in
+`web/src/lib/format.ts`. A column would make it configurable before anybody
+has asked for a different number, and every read would have to join to find
+out today's answer.
+
+**No `source_url` column**, though the console edits one today. One URL cannot
+hold it: tuition is on the fees page, entry requirements on the course page,
+intakes on an admissions page. `programme_sources` in `006` is a table for
+that reason, and a column here would have to be migrated away in the next
+file.
+
+**No `flagged` boolean.** `006`'s `catalogue_flags` is a table because a flag
+has an author, a reason and an outcome. A boolean records that somebody
+objected and not what to.
+
+## The erasure order has changed again
+
+`programmes` adds two `RESTRICT` edges to `users` (`verified_by`,
+`created_by`) and one to `institutions`, so it joins the ordered purge from
+parts 2 and 3 — before `users`:
+
+    lead_facts → lead_documents → meetings → leads → programmes → institutions → users → tenant
+
+`programme_intakes` and `programme_requirements` cascade from `programmes` and
+need no step of their own: they have no meaning without their programme,
+unlike the audit columns, which have meaning without their user.
