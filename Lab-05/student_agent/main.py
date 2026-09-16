@@ -42,7 +42,7 @@ from strands.models.openai import OpenAIModel  # noqa: E402
 
 from agent.core import ROOT, build_agent, prepend_context  # noqa: E402
 import envelope  # noqa: E402
-from api import tenant as tenant_routes, users as users_routes  # noqa: E402
+from api import catalogue as catalogue_routes, tenant as tenant_routes, users as users_routes  # noqa: E402
 from auth import Principal, require_permission  # noqa: E402
 from envelope import ApiError, EnvelopeRoute  # noqa: E402
 from agent.hooks import sanitise_student_text  # noqa: E402
@@ -415,6 +415,7 @@ app.add_middleware(
 # EnvelopeRoute — include_router does NOT inherit the app's route class.
 app.include_router(users_routes.router)
 app.include_router(tenant_routes.router)
+app.include_router(catalogue_routes.router)
 
 
 @app.get("/health")
