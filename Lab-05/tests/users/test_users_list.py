@@ -59,11 +59,22 @@ def test_tenant_cannot_be_chosen_by_the_caller(client, seed):
 # ---------------------------------------------------------------------------
 
 def test_the_row_shape_is_stable(client):
+    """An exact set, not a subset.
+
+    A subset check would pass while the response quietly grew a column the
+    repository started selecting — which is exactly how `clerk_user_id` would
+    reach the wire. `test_the_clerk_id_is_not_exposed` names that one
+    specifically; this is the net that catches the next one nobody thought of.
+    """
     _, body = get(client)
     row = next(u for u in body["data"] if u["email"] == "priya@a.test")
     assert set(row) == {
         "id", "name", "email", "role", "status", "timezone", "work_phone",
         "countries", "invited_at", "accepted_at", "created_at",
+        # Resolved per request from Clerk, which owns the image — there is no
+        # avatar column and SCHEMA.md forbids one. Null is the common case,
+        # and stays null when Clerk is unreachable.
+        "image_url",
     }
     assert row["role"] == "owner"
     assert row["work_phone"] == "+94771234567"
