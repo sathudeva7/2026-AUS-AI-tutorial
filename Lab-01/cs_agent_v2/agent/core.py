@@ -72,10 +72,12 @@ def _memory_protocol() -> str:
     system prompt; the memory BODY itself is injected into the user message
     via `prepend_memory()` so it doesn't get drowned by instruction text.
 
-    The "write" half is framed as a judgment call (not a routine), with an
-    explicit "reference the DB; don't duplicate" rule, plus a calibrating
-    example using a real observed failure case (note missing order ID +
-    action taken on a gpt-5.4-mini run).
+    The "write" half is framed as the turn's closing step rather than a
+    judgment call — gpt-5.4-mini skipped the write on 4 of 5 observed runs
+    when it read as optional. Keeps the explicit "reference the DB; don't
+    duplicate" rule, plus two calibrating failures seen on real runs: a note
+    missing the order ID + action, and a note recording the problem but not
+    the response.
     """
     return """\
 ## Episodic memory
@@ -93,16 +95,25 @@ Prior notes for the current customer arrive at the top of their first user messa
 ### Stays out — reference the DB instead
 Refund refs, ticket IDs, order status, tier, policy text. Anything a tool returns. Cite by ID ("see #1234 via get_order"); do NOT copy. Duplication rots.
 
-### When to write
-Ask: **"Would the next agent miss something important if I write nothing right now?"**
+### When to write — the closing step of every turn
+This runs before you reply. It is part of the turn, not an optional extra.
 
-- Yes → call `append_memory(customer_id="", note=...)` BEFORE your reply. One line, packing: order ID, action / promise, tone, pattern (if any).
-- No → skip. Info-only turns need no note.
+Did you, this turn, **take an action** (refund, cancellation, ticket, address change), **make a promise**, or **learn something about this customer that no tool returns**?
 
-### Example
+- Yes → call `append_memory(customer_id="", note=...)` NOW, before writing your reply.
+- No → skip. Purely informational turns need no note.
+
+If you escalated or wrote anything to the backend, the answer is Yes. **An action with no note is an unfinished turn.**
+
+One line, packing: order ID — what you did — tone — pattern (if any).
+
+### Examples
 ✅ "#1234 late, flight tomorrow; issued $10 shipping_delay credit. Tone: pressed but reasonable."
 ❌ "Urgent travel deadline on late-order; flying tomorrow. Tone: pressed but reasonable."
-(Missing order ID + action — useless to the next agent.)"""
+(Missing order ID + action — useless to the next agent.)
+❌ "#5050 chairs arrived damaged, 12-unit B2B order. Tone: pressed."
+(Records the problem but not the response — the next agent cannot tell whether
+anything was already done, and re-does it.)"""
 
 
 def prepend_memory(
@@ -202,7 +213,7 @@ def build_agent(
     local_tools: list = []
     memory_section = ""
     if profile.memory.episodic.enabled:
-        memory_section = "## Episodic memory\n\n" + _memory_protocol()
+        memory_section = _memory_protocol()
         local_tools.extend([memory.append_memory, memory.compact_memory])
 
     # --- Skills: AgentSkills plugin auto-discovers SKILL.md under skills_dir,
