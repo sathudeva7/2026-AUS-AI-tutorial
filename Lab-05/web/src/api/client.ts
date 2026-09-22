@@ -93,13 +93,22 @@ async function unwrapWithMeta<T>(
   const code = err?.code ?? "ERROR";
   const message = err?.message ?? `${label} failed (${response.status}).`;
 
+  // Status before details, and the order matters. A permission refusal is a
+  // 403 that ALSO carries a detail — auth.py sends the key it wanted as
+  // `{field: "permission"}` so nobody has to split a sentence to find it.
+  // Read the other way round, every 403 in the product came back as a
+  // validation error about a field no form has, which cost twice: surfaces
+  // could not tell "you may not" from "you typed that wrong", and
+  // queryClient's retry rule — which spares NotAuthenticatedError because
+  // retrying a refusal cannot change the answer — never matched, so each
+  // forbidden read was sent three times.
+  if (response.status === 401 || response.status === 403) {
+    throw new NotAuthenticatedError(response.status, code, message, rid);
+  }
   if (err?.details?.length) {
     const fields: Record<string, string> = {};
     for (const d of err.details) fields[d.field] = d.issue;
     throw new FieldValidationError(fields, message, rid);
-  }
-  if (response.status === 401 || response.status === 403) {
-    throw new NotAuthenticatedError(response.status, code, message, rid);
   }
   throw new ApiRequestError(response.status, code, message, rid);
 }
