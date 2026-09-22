@@ -4,7 +4,7 @@ B2B SaaS for overseas-education consultancies. An AI agent owns the first respon
 
 Multi-tenant. Each agency loads its own catalogue, requirement rules, counsellor roster and country ownership. Demo tenant is Serendib Education; all fees and deadlines in seed data are placeholder.
 
-**Read** `AGENTS.md` **before touching agent code.** It holds the agent loop, the tool contracts and the non-negotiable rules. This file is orientation and conventions only.
+Before touching agent code, read `student_agent/agent-profile.yaml` — it is the complete declarative description of the agent: identity, system prompt, MCP servers, memory and the confidence floor. `student_agent/agent/core.py` is the loader that reads it, and `student_agent/skills/` holds the per-situation playbooks. This file is orientation and conventions only.
 
 ## The problem
 
@@ -31,14 +31,14 @@ app/
   services/     catalogue matching, requirement evaluation, routing
   worker/       follow-up jobs
 web/            widget + dashboard
-tests/          scenario tests (see AGENTS.md)
+tests/          API tests against real Postgres
 ```
 
 
 
 ## Core entities
 
-`Tenant`, `User`, `Programme`, `Lead`, `Message`, `ToolCall`, `Followup`. Field lists are in `AGENTS.md`; the people-and-access tables are drawn in `db/SCHEMA.md`.
+`Tenant`, `User`, `Programme`, `Lead`, `Message`, `ToolCall`, `Followup`. Field lists are in `db/migrations/`; `db/SCHEMA.md` explains the tables and, as importantly, what was deliberately left out of them.
 
 Roles and permissions are not entities. A role is an enum on `User`; the permission catalogue is a code constant in `student_agent/permissions.py`.
 
@@ -76,8 +76,9 @@ These are product guarantees, not preferences. Do not soften them for convenienc
 - Times stored UTC, rendered in the **viewer's** timezone, not the tenant's — an agency with branches in two countries has no single correct clock, and the student has their own. Any time two parties must both attend (a booked consultation) carries its zone; a bare "10:30" across zones is a missed call. See `web/src/lib/format.ts`.
 - Tool inputs and outputs are Pydantic models; the JSON schema is generated from them, never hand-written.
 - Confidence floor is tenant config, not a constant. It is deliberately not on `tenants` — it lands with the agent-config slice. Until then it has no home, and hardcoding it is not the answer.
-- Prompt lives in one versioned file. Changing it requires re-running the scenario tests.
-- Scenario tests in `AGENTS.md` are the acceptance suite. A change that breaks one is a regression, including "the agent was more helpful".
+- Prompt lives in one versioned file — `agent-profile.yaml`. Changing it means re-testing the agent by hand; see the note below.
+- `tests/` and `db/tests/` are the acceptance suite. A change that breaks one is a regression until proven otherwise.
+- There are no automated tests of agent BEHAVIOUR yet. Changing the prompt or a skill is currently verified by hand, through the UI.
 
 
 
@@ -89,5 +90,5 @@ The frontend follows the **Organic** design system — cream and sand ground, te
 
 - Prefer failing loudly over degrading gracefully. A tool that errors should surface and escalate, never fall back to model knowledge.
 - Do not add fields, screens or config the current scope needs. v1 is deliberately small.
-- If a requirement here conflicts with `AGENTS.md`, `AGENTS.md` wins for agent behaviour; ask before resolving anything else.
+- For agent behaviour, `agent-profile.yaml` is the authority — it is what the running agent actually reads. If anything here conflicts with it, ask before resolving.
 
