@@ -32,11 +32,46 @@ export function formatMoney(amount: number, currency: string): string {
   }).format(amount);
 }
 
-/** Minor units (pence, cents) to a display string. The catalogue does not use
- *  this yet — the seed stores major units — but anything written against the
- *  real Postgres schema will. */
+/** How many decimal places a currency has, where it is not two.
+ *
+ * The same table as `student_agent/services/money.py`, which owns the write
+ * side. Duplicated rather than fetched because it changes roughly never and a
+ * network round trip before a table can render a fee buys nothing — the same
+ * argument `data/countries.ts` makes for holding the ISO list.
+ */
+const MINOR_UNIT_DIGITS: Record<string, number> = {
+  BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0, PYG: 0,
+  RWF: 0, UGX: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0,
+  BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3,
+  CLF: 4, UYW: 4,
+};
+
+/** Minor units (pence, cents) to a display string.
+ *
+ * NOT a plain division by 100. Japanese yen has no minor unit at all, so a
+ * ¥1,200,000 fee stored correctly and divided by 100 here reads as ¥12,000 —
+ * wrong by two orders of magnitude, and wrong in the direction a student
+ * would happily believe.
+ */
 export function formatMinorUnits(minor: number, currency: string): string {
-  return formatMoney(minor / 100, currency);
+  const digits = MINOR_UNIT_DIGITS[currency.toUpperCase()] ?? 2;
+  return formatMoney(minor / 10 ** digits, currency);
+}
+
+/** Minor units back to a bare figure, for an editable input.
+ *
+ * Not `formatMinorUnits`: that produces "£24,500", and a currency symbol and
+ * thousands separators in a box whose value is PATCHed back is how you get a
+ * fee refused as unparseable — or worse, parsed as a different number. The
+ * write path takes the figure as a person would type it, and this is the
+ * round trip of that.
+ *
+ * Fixed to the currency's own precision, so a JPY fee never grows decimals
+ * it does not have and a BHD one never loses its third place.
+ */
+export function minorUnitsToInput(minor: number, currency: string): string {
+  const digits = MINOR_UNIT_DIGITS[currency.toUpperCase()] ?? 2;
+  return (minor / 10 ** digits).toFixed(digits);
 }
 
 function parse(iso: string): Date | null {

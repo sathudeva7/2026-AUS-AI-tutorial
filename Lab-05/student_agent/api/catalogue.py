@@ -158,6 +158,10 @@ def list_programmes(
             # Sent rather than hardcoded in the client so the badge and the
             # filter cannot disagree about what stale means.
             "counts": catalogue_repo.counts(principal.tenant_id),
+            # The filter's options. Built from the rows on screen it would be
+            # "the countries on page one" — a dropdown that cannot offer the
+            # value somebody is looking for.
+            "countries": catalogue_repo.country_codes(principal.tenant_id),
             "stale_after_days": catalogue_repo.STALE_AFTER_DAYS,
         },
     )

@@ -209,7 +209,14 @@ def counts(tenant_id: str) -> dict[str, int]:
                     count(*) filter (where status = 'published'
                                        and verified_at <  :stale_before)  as stale,
                     count(*) filter (where status = 'draft')              as draft,
-                    count(*) filter (where status = 'archived')           as archived
+                    count(*) filter (where status = 'archived')           as archived,
+                    -- Two tiles the table itself cannot answer once paging is
+                    -- server-side: page one of fifteen knows about one page's
+                    -- universities, not the agency's.
+                    count(distinct institution_id)
+                        filter (where status <> 'archived')                as institutions,
+                    count(distinct country)
+                        filter (where status <> 'archived')                as countries
                   from programmes
                  where tenant_id = :tenant_id
             """),
@@ -541,3 +548,24 @@ def duplicate(tenant_id: str, programme_id: UUID, created_by: str) -> UUID | Non
             {"t": tenant_id, "p": programme_id, "new": new_id},
         )
     return new_id
+
+
+def country_codes(tenant_id: str) -> list[str]:
+    """Every destination this catalogue covers, for the filter's options.
+
+    Server-side paging is why this exists. The dropdown used to be built from
+    the rows on screen, which was complete while the whole fixture was in
+    memory and becomes "the countries on page one" the moment the list is a
+    page — a filter that cannot offer the value you are looking for.
+
+    Archived rows are left out: the default list hides them, so offering their
+    country would produce an empty table.
+    """
+    with engine().connect() as conn:
+        return list(conn.execute(
+            text("select distinct country from programmes"
+                 " where tenant_id = :t and status <> 'archived'"
+                 "   and country is not null"
+                 " order by country"),
+            {"t": tenant_id},
+        ).scalars().all())

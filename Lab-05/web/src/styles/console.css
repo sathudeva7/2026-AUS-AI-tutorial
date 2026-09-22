@@ -880,6 +880,23 @@
   font-weight: 500;
 }
 
+/* Stacked on a narrow screen. Sharing one row with the buttons squeezed the
+   note into a four-word column that ran taller than the viewport, which is a
+   sentence nobody reads and a Save button nobody can reach. */
+@media (max-width: 680px) {
+  .console-actionbar {
+    flex-wrap: wrap;
+  }
+
+  .console-actionbar-note {
+    flex: 1 0 100%;
+  }
+
+  .console-actionbar .console-btn {
+    flex: 1;
+  }
+}
+
 /* ------------------------------------------------------------------ *
  * The requirement grid, shared by the editor and the catalogue's rules tab
  * ------------------------------------------------------------------ */
@@ -2000,4 +2017,384 @@
 .console-page-btn:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* ------------------------------------------------------------------ *
+ * Adding a programme: the start band
+ *
+ * One form, two ways of filling it — not two modes chosen up front. The url
+ * box is usable the moment the page opens because that is the common case:
+ * the counsellor has the university's course page in the next tab. Typing it
+ * out by hand is one click away underneath, not hidden and not a rival card
+ * of equal weight, because it is genuinely the slower road.
+ * ------------------------------------------------------------------ */
+
+.console-start {
+  padding: 20px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-xl);
+  background: var(--c-card);
+}
+
+.console-start-row {
+  display: flex;
+  max-width: 760px;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 600px) {
+  .console-start-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.console-start-row .console-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Deliberately not a second primary button. There is one obvious action on
+   this band and it is Read page; the manual road is a real choice but a
+   quieter one, and two filled buttons side by side would say they are the
+   same size of decision. */
+.console-start-alt {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-line);
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+.console-start-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--c-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ *
+ * The readout, while a page is being read
+ *
+ * The work, in the order it happens, rather than a spinner. The student
+ * widget already shows the agent's tool calls as they run; a counsellor
+ * watching a page get read is owed the same. It also makes a slow leg
+ * legible — "Entry requirements" sitting for four seconds is information,
+ * where a bar at 60% is not.
+ * ------------------------------------------------------------------ */
+
+.console-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 14px;
+}
+
+.console-readout-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: var(--t-body);
+  color: var(--c-ink-faint);
+}
+
+.console-readout-line[data-state="running"] {
+  color: var(--c-ink);
+}
+
+.console-readout-line[data-state="done"] {
+  color: var(--c-ink-body);
+}
+
+.console-readout-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--c-ok);
+}
+
+/* A dot that breathes while its leg is running, and nothing at all for legs
+   that have not started. One moving thing on the screen. */
+.console-readout-line[data-state="running"] .console-readout-mark::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--c-accent);
+  animation: console-breathe 1.1s ease-in-out infinite;
+}
+
+.console-readout-line[data-state="pending"] .console-readout-mark::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--c-line-strong);
+}
+
+@keyframes console-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.72); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .console-readout-line[data-state="running"] .console-readout-mark::before {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * A field filled in from a page, with the line it came from
+ *
+ * The rule down the left means exactly one thing: a machine put this value
+ * here and nobody has looked at it yet. It is soft amber because that is
+ * already this console's colour for "look at this", never for "broken" — an
+ * unread extraction is not an error. As fields are confirmed the amber
+ * drains off the page, which is the progress bar for the review.
+ *
+ * Fields the page did not mention get NO rule and no quote. They are
+ * ordinary empty boxes, the same as the manual road, because that is what
+ * they are — and giving them the same marker would make "a machine guessed"
+ * and "nobody has typed it" look alike while meaning opposite things.
+ * ------------------------------------------------------------------ */
+
+.console-sourced {
+  padding-left: 12px;
+  border-left: 2px solid transparent;
+}
+
+.console-sourced[data-state="unconfirmed"] {
+  border-left-color: var(--c-warn);
+}
+
+/* Confirmed recedes rather than turning green. The person's attention should
+   land on what is still outstanding, and a page of ticks competes with it. */
+.console-sourced[data-state="confirmed"] {
+  border-left-color: var(--c-line);
+}
+
+.console-quote {
+  margin: 7px 0 0;
+  font-size: var(--t-meta);
+  line-height: 1.5;
+  color: var(--c-ink-body);
+}
+
+/* Quotation marks are drawn, not typed, so the words inside are exactly the
+   page's words and a copy out of this box does not carry punctuation the
+   page never had. */
+.console-quote-words::before { content: "\201C"; }
+.console-quote-words::after { content: "\201D"; }
+
+.console-quote-where {
+  color: var(--c-ink-faint);
+}
+
+.console-sourced[data-state="confirmed"] .console-quote {
+  color: var(--c-ink-faint);
+}
+
+.console-sourced-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 7px;
+}
+
+.console-confirm {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  white-space: nowrap;
+  padding: 0 11px;
+  border: 1px solid var(--c-warn-line);
+  border-radius: var(--r-pill);
+  background: var(--c-warn-soft);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-warn);
+  cursor: pointer;
+}
+
+.console-confirm:hover {
+  border-color: var(--c-warn);
+}
+
+/* Undoable, and it says so by staying a button. A confirmation you cannot
+   take back is one people give carefully once and then resent. */
+.console-confirm[data-done="true"] {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  color: var(--c-ok);
+}
+
+.console-confirm[data-done="true"]:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Said where the empty box is, so the answer to "why is this blank" is next
+   to the blank. */
+.console-notfound {
+  margin: 7px 0 0;
+  font-size: var(--t-meta);
+  color: var(--c-ink-muted);
+}
+
+/* ------------------------------------------------------------------ *
+ * The review banner
+ *
+ * Sits above the form for the whole review and counts down. It names the
+ * source, what is left to confirm, and what the page did not say — the same
+ * habit as the action bar, which never just says "invalid".
+ * ------------------------------------------------------------------ */
+
+.console-review {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--c-line);
+  border-left: 3px solid var(--c-accent);
+  border-radius: var(--r-xl);
+  background: var(--c-card);
+}
+
+.console-review-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.console-review-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.console-review-sub {
+  /* Measured, not full-bleed. At 1040px this paragraph ran to 140 characters
+     a line, which is roughly twice what anybody tracks comfortably. */
+  max-width: 72ch;
+  margin: 4px 0 0;
+  font-size: var(--t-meta);
+  line-height: 1.5;
+  color: var(--c-ink-muted);
+}
+
+.console-review-src {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--c-ink-body);
+}
+
+/* ------------------------------------------------------------------ *
+ * A proposed rule or intake, before anybody agrees to it
+ *
+ * Structured claims are accepted one at a time. A requirement that joined
+ * the set on its own would be an entry condition no human wrote, quietly
+ * excluding students from every shortlist it touches — so each one shows the
+ * sentence behind it and waits.
+ * ------------------------------------------------------------------ */
+
+.console-proposals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--c-warn-line);
+  border-radius: var(--r-lg);
+  background: var(--c-warn-soft);
+}
+
+.console-proposals-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--c-warn);
+}
+
+.console-proposal {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-warn-line);
+  border-radius: var(--r-md);
+  background: var(--c-card);
+}
+
+.console-proposal-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.console-proposal-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.console-proposal-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+/* Amber text on the row it belongs to, rather than a badge: the point is
+   that this particular line is ambiguous, and a badge floats free of it. */
+.console-unclear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-warn);
+}
+
+/* Taking a proposal is the affirmative act on these rows, so it gets a filled
+   button. The dashed `.console-chip-add` beside the requirement templates is
+   a different verb — "put a blank one in" — and borrowing it here made the
+   main action of the row look like the tentative one. */
+.console-proposal-add {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--c-accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.console-proposal-add:hover {
+  background: var(--c-accent-hover);
 }

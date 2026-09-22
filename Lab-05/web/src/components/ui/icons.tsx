@@ -245,3 +245,23 @@ export function GraduationIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** A tick. Used for a leg of work that finished and for a value somebody
+ *  confirmed — both are "this one is settled", so both get the same glyph. */
+export function CheckIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M5 12.5l4.5 4.5L19 7" />
+    </svg>
+  );
+}
+
+/** A link. Marks the url a figure was read from. */
+export function LinkIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M10.5 13.5a4 4 0 006 .5l2-2a4 4 0 00-5.5-5.5l-1 1" />
+      <path d="M13.5 10.5a4 4 0 00-6-.5l-2 2a4 4 0 005.5 5.5l1-1" />
+    </svg>
+  );
+}

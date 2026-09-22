@@ -6,14 +6,19 @@
  * it was last verified and why a stale row says so in words rather than only
  * in colour.
  *
- * Fixture-backed, and that is not hidden. There is no `GET /api/programmes`
- * and no PUT behind it: `catalogueStore` is a session overlay, so an edit
- * survives navigation and not a reload. Every destructive control here says
- * so at the point of use rather than letting the table imply a catalogue the
+ * The Programmes tab is LIVE: `GET /api/programmes`, tenant-scoped, with
+ * search, filtering and paging done by the server. Archiving and duplicating
+ * go through their endpoints too.
+ *
+ * The other two tabs are still fixtures, and that is not hidden. Entry
+ * requirements need a per-programme read (the list deliberately does not carry
+ * them — it would be a query per row), and the refresh queue has no backend at
+ * all until 006. Both say so on screen rather than implying a catalogue the
  * agent reads has changed.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 import { Button, Card, StatusChip } from "@/components/ui";
 import { Dialog } from "@/components/ui/Dialog";
@@ -29,20 +34,25 @@ import {
   SearchIcon,
   SlidersIcon,
 } from "@/components/ui/icons";
-import {
-  decideRefreshItem,
-  deleteProgramme,
-  duplicateProgramme,
-  useCatalogue,
-} from "@/data/catalogueStore";
-import { COUNTRY_BY_CODE, toCountryCode } from "@/data/countries";
-import { formatDate, formatMoney, verifiedLabel } from "@/lib/format";
+import { decideRefreshItem, useCatalogue } from "@/data/catalogueStore";
+import { COUNTRY_BY_CODE } from "@/data/countries";
+import { formatDate, formatMinorUnits, verifiedLabel } from "@/lib/format";
 import {
   levelLabel,
   orgInitials,
-  statusOf,
+  rowStatus,
   STATUS_LABEL,
 } from "@/features/catalogue/display";
+import {
+  useArchiveProgramme,
+  useDuplicateProgramme,
+  useProgrammeList,
+} from "@/features/catalogue/queries";
+import type {
+  ProgrammeListParams,
+  ProgrammeListResult,
+  ProgrammeRow,
+} from "@/features/catalogue/types";
 import type { Programme, RefreshItem } from "@/data/types";
 
 type TabValue = "programmes" | "rules" | "freshness";
@@ -59,11 +69,34 @@ export function CatalogueRoute() {
   const [params, setParams] = useSearchParams();
   const tab = (params.get("tab") as TabValue) ?? "programmes";
   const navigate = useNavigate();
-  const { programmes, refreshItems } = useCatalogue();
 
-  const institutions = new Set(programmes.map((p) => p.institution)).size;
-  const countries = new Set(programmes.map((p) => p.country)).size;
-  const needsCheck = programmes.filter((p) => statusOf(p) !== "active").length;
+  // Still the fixture, and only for the two tabs that have no endpoint behind
+  // them yet: entry requirements need a per-programme read, and the refresh
+  // queue is 006. The Programmes tab below is live.
+  const { programmes: fixtureProgrammes, refreshItems } = useCatalogue();
+
+  // The filters live HERE rather than in the tab, because the tiles above the
+  // table are drawn from the same response. Two components asking separately
+  // would be two requests, and worse, two answers that can disagree.
+  const [query, setQuery] = useState("");
+  const [country, setCountry] = useState("");
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(10);
+
+  // Typing is not a request per keystroke. Without this every letter in the
+  // search box is a round trip, and the answers can arrive out of order.
+  const search = useDebounced(query, 250);
+
+  const list = useProgrammeList({
+    search,
+    country: country || undefined,
+    status: (status || undefined) as ProgrammeListParams["status"],
+    limit: perPage,
+    offset: page * perPage,
+  });
+
+  const counts = list.data?.counts;
 
   return (
     <div className="console console-sheet-page">
@@ -97,32 +130,36 @@ export function CatalogueRoute() {
         </button>
       </div>
 
-      {/* Four counts, all of them read off the rows in the table below.
+      {/* Counted by the server over the WHOLE catalogue, not over the rows on
+          screen. Page one of fifteen knows about one page's universities, and
+          a tile that changed as you paged would be answering a different
+          question from the one its label asks.
+
           "Needs verification" is the only one anybody acts on, which is why it
           is the only one wearing red. */}
       <div className="console-tiles">
         <Tile
           tone="accent"
           icon={<GraduationIcon size={20} />}
-          value={programmes.length}
+          value={counts?.all}
           label="Total programmes"
         />
         <Tile
           tone="info"
           icon={<InstitutionIcon size={20} />}
-          value={institutions}
-          label={institutions === 1 ? "Institution" : "Institutions"}
+          value={counts?.institutions}
+          label={counts?.institutions === 1 ? "Institution" : "Institutions"}
         />
         <Tile
           tone="warn"
           icon={<GlobeIcon size={20} />}
-          value={countries}
-          label={countries === 1 ? "Country" : "Countries"}
+          value={counts?.countries}
+          label={counts?.countries === 1 ? "Country" : "Countries"}
         />
         <Tile
           tone="danger"
           icon={<ClockIcon size={20} />}
-          value={needsCheck}
+          value={counts ? counts.stale + counts.draft : undefined}
           label="Needs verification"
         />
       </div>
@@ -138,21 +175,57 @@ export function CatalogueRoute() {
             onClick={() => setParams({ tab: t.value })}
           >
             {t.label}
-            {t.value === "programmes" ? ` (${programmes.length})` : ""}
+            {t.value === "programmes" && counts ? ` (${counts.all})` : ""}
           </button>
         ))}
       </div>
 
       {tab === "programmes" ? (
         <ProgrammesTab
-          programmes={programmes}
+          list={list}
+          query={query}
+          country={country}
+          status={status}
+          page={page}
+          perPage={perPage}
+          onQuery={(v) => {
+            setQuery(v);
+            setPage(0);
+          }}
+          onCountry={(v) => {
+            setCountry(v);
+            setPage(0);
+          }}
+          onStatus={(v) => {
+            setStatus(v);
+            setPage(0);
+          }}
+          onPage={setPage}
+          onPerPage={(n) => {
+            setPerPage(n);
+            setPage(0);
+          }}
           onOpen={(id) => navigate(`/catalogue/${id}`)}
         />
       ) : null}
-      {tab === "rules" ? <RulesTab programmes={programmes} /> : null}
+      {tab === "rules" ? <RulesTab programmes={fixtureProgrammes} /> : null}
       {tab === "freshness" ? <FreshnessTab items={refreshItems} /> : null}
     </div>
   );
+}
+
+/** A value that stops changing once the user stops typing.
+ *
+ * Here rather than in lib/ until something else needs it — one caller is not
+ * a shared utility, it is a local detail of this screen.
+ */
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setSettled(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return settled;
 }
 
 function Tile({
@@ -163,7 +236,9 @@ function Tile({
 }: {
   tone: "accent" | "info" | "warn" | "danger";
   icon: React.ReactNode;
-  value: number;
+  /** Undefined while the first page is in flight. An em dash rather than 0,
+   *  because a zero somebody reads as a fact is worse than a blank. */
+  value: number | undefined;
   label: string;
 }) {
   return (
@@ -172,7 +247,7 @@ function Tile({
         {icon}
       </span>
       <div>
-        <div className="console-tile-value">{value}</div>
+        <div className="console-tile-value">{value ?? "—"}</div>
         <div className="console-tile-label">{label}</div>
       </div>
     </div>
@@ -180,42 +255,53 @@ function Tile({
 }
 
 function ProgrammesTab({
-  programmes,
+  list,
+  query,
+  country,
+  status,
+  page,
+  perPage,
+  onQuery,
+  onCountry,
+  onStatus,
+  onPage,
+  onPerPage,
   onOpen,
 }: {
-  programmes: Programme[];
+  list: UseQueryResult<ProgrammeListResult>;
+  query: string;
+  country: string;
+  status: string;
+  page: number;
+  perPage: number;
+  onQuery: (v: string) => void;
+  onCountry: (v: string) => void;
+  onStatus: (v: string) => void;
+  onPage: (n: number) => void;
+  onPerPage: (n: number) => void;
   onOpen: (programmeId: string) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [country, setCountry] = useState("");
-  const [status, setStatus] = useState("");
-  const [page, setPage] = useState(0);
-  const [perPage, setPerPage] = useState(10);
-  const [confirmDelete, setConfirmDelete] = useState<Programme | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState<ProgrammeRow | null>(null);
+  const archive = useArchiveProgramme();
+  const duplicate = useDuplicateProgramme();
 
+  const rows = list.data?.rows ?? [];
+  const total = list.data?.total ?? 0;
+  const staleAfterDays = list.data?.staleAfterDays ?? 30;
+
+  // Every destination in the catalogue, not the ones on this page. Built from
+  // the rows on screen this dropdown could not offer the value you were
+  // looking for.
   const countryOptions = [
     { value: "", label: "All countries" },
-    ...[...new Set(programmes.map((p) => p.country))]
-      .sort()
-      .map((c) => ({ value: c, label: c })),
+    ...(list.data?.countries ?? []).map((code) => ({
+      value: code,
+      label: COUNTRY_BY_CODE[code]?.name ?? code,
+    })),
   ];
 
-  const needle = query.trim().toLowerCase();
-  const shown = programmes.filter((p) => {
-    if (country && p.country !== country) return false;
-    if (status && statusOf(p) !== status) return false;
-    if (!needle) return true;
-    return [p.name, p.institution, p.country, p.city, p.field, p.level].some(
-      (f) => f.toLowerCase().includes(needle),
-    );
-  });
-
-  // Clamped rather than reset. Filtering down to three rows while on page 4
-  // would otherwise show an empty table with no way to tell why.
-  const pages = Math.max(1, Math.ceil(shown.length / perPage));
-  const current = Math.min(page, pages - 1);
-  const from = current * perPage;
-  const rows = shown.slice(from, from + perPage);
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const from = page * perPage;
 
   return (
     <>
@@ -228,10 +314,7 @@ function ProgrammesTab({
             value={query}
             placeholder="Search programmes, institutions…"
             aria-label="Search programmes"
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(0);
-            }}
+            onChange={(e) => onQuery(e.target.value)}
           />
         </div>
 
@@ -240,10 +323,7 @@ function ProgrammesTab({
           value={country}
           options={countryOptions}
           ariaLabel="Filter by country"
-          onChange={(v) => {
-            setCountry(v);
-            setPage(0);
-          }}
+          onChange={onCountry}
         />
 
         <Select
@@ -256,11 +336,11 @@ function ProgrammesTab({
             { value: "active", label: "Active" },
             { value: "stale", label: "Needs check" },
             { value: "draft", label: "Draft" },
+            // Archived rows are hidden by default. Without a way to ask for
+            // them, an archived programme is one nobody can ever restore.
+            { value: "archived", label: "Archived" },
           ]}
-          onChange={(v) => {
-            setStatus(v);
-            setPage(0);
-          }}
+          onChange={onStatus}
         />
 
         {query || country || status ? (
@@ -269,10 +349,9 @@ function ProgrammesTab({
             className="console-btn"
             data-variant="secondary"
             onClick={() => {
-              setQuery("");
-              setCountry("");
-              setStatus("");
-              setPage(0);
+              onQuery("");
+              onCountry("");
+              onStatus("");
             }}
           >
             <SlidersIcon size={15} />
@@ -281,11 +360,18 @@ function ProgrammesTab({
         ) : null}
 
         <span className="console-meta ml-auto">
-          {shown.length === programmes.length
-            ? `${programmes.length} programmes`
-            : `${shown.length} of ${programmes.length} programmes`}
+          {list.isPending ? "Reading the catalogue…" : `${total} programmes`}
         </span>
       </div>
+
+      {/* A failed read must not look like an empty catalogue. CLAUDE.md:
+          prefer failing loudly over degrading gracefully — "no programmes" is
+          a different claim from "we could not ask". */}
+      {list.isError ? (
+        <div className="console-notice" data-tone="danger">
+          {(list.error as Error).message}
+        </div>
+      ) : null}
 
       <div className="console-table-wrap">
         <table className="console-table">
@@ -295,7 +381,7 @@ function ProgrammesTab({
               <th scope="col">Institution</th>
               <th scope="col">Country</th>
               <th scope="col">Tuition</th>
-              <th scope="col">Application deadline</th>
+              <th scope="col">Next deadline</th>
               <th scope="col">Last verified</th>
               <th scope="col">Status</th>
               <th scope="col">Actions</th>
@@ -303,13 +389,12 @@ function ProgrammesTab({
           </thead>
           <tbody>
             {rows.map((programme) => {
-              const rowStatus = statusOf(programme);
-              const code = toCountryCode(programme.country);
+              const state = rowStatus(programme, staleAfterDays);
               return (
                 <tr
-                  key={programme.programme_id}
+                  key={programme.id}
                   data-clickable="true"
-                  onClick={() => onOpen(programme.programme_id)}
+                  onClick={() => onOpen(programme.id)}
                 >
                   <td>
                     <div className="console-cell-title">{programme.name}</div>
@@ -322,39 +407,70 @@ function ProgrammesTab({
                       <span className="console-org" aria-hidden="true">
                         {orgInitials(programme.institution)}
                       </span>
-                      <span className="min-w-0">{programme.institution}</span>
+                      <span className="min-w-0">
+                        {programme.institution ?? "—"}
+                      </span>
                     </span>
                   </td>
                   <td>
                     <span className="flex items-center gap-2">
                       <span className="console-flag" aria-hidden="true">
-                        {COUNTRY_BY_CODE[code]?.flag ?? "🏳"}
+                        {programme.country
+                          ? (COUNTRY_BY_CODE[programme.country]?.flag ?? "🏳")
+                          : "🏳"}
                       </span>
-                      {programme.country}
+                      {/* The name, not the code. Nobody reads "LK" and thinks
+                          Sri Lanka on the first pass. */}
+                      {programme.country
+                        ? (COUNTRY_BY_CODE[programme.country]?.name ??
+                          programme.country)
+                        : "—"}
                     </span>
                   </td>
                   <td>
-                    {formatMoney(
-                      programme.tuition_per_year,
-                      programme.currency,
+                    {programme.tuition_per_year_minor === null ||
+                    !programme.currency
+                      ? "—"
+                      : formatMinorUnits(
+                          programme.tuition_per_year_minor,
+                          programme.currency,
+                        )}
+                  </td>
+                  {/* The next intake still OPEN. Once every intake has passed
+                      there is no date to act on, and showing last year's would
+                      be worse than saying so. */}
+                  <td>
+                    {programme.next_deadline ? (
+                      <>
+                        {formatDate(programme.next_deadline)}
+                        <div className="console-cell-sub">
+                          {programme.next_intake}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="console-meta">No open intake</span>
                     )}
                   </td>
-                  <td>{formatDate(programme.application_deadline)}</td>
                   {/* The date in words, not a bare timestamp: "5 weeks ago" is
                       the thing somebody acts on. */}
                   <td className="console-meta">
-                    {programme.draft
-                      ? "Never"
-                      : verifiedLabel(programme.verified_at)}
+                    {programme.verified_at
+                      ? verifiedLabel(programme.verified_at, staleAfterDays)
+                      : "Never"}
+                    {programme.edited_since_verified ? (
+                      <div className="console-cell-sub">
+                        edited since
+                      </div>
+                    ) : null}
                   </td>
                   <td>
                     <span
                       className="console-lead-status"
                       data-status={
-                        rowStatus === "active" ? "converted" : "escalated"
+                        state === "active" ? "converted" : "escalated"
                       }
                     >
-                      {STATUS_LABEL[rowStatus]}
+                      {STATUS_LABEL[state]}
                     </span>
                   </td>
                   <td
@@ -368,21 +484,22 @@ function ProgrammesTab({
                       items={[
                         {
                           label: "Edit",
-                          onSelect: () => onOpen(programme.programme_id),
+                          onSelect: () => onOpen(programme.id),
                         },
                         {
                           label: "Duplicate",
                           onSelect: () => {
-                            const copy = duplicateProgramme(
-                              programme.programme_id,
-                            );
-                            if (copy) onOpen(copy.programme_id);
+                            duplicate.mutate(programme.id, {
+                              onSuccess: (copy) => onOpen(copy.id),
+                            });
                           },
                         },
                         {
-                          label: "Delete",
+                          // Archive, not delete. The row is kept because past
+                          // tool_calls name it.
+                          label: "Archive",
                           danger: true,
-                          onSelect: () => setConfirmDelete(programme),
+                          onSelect: () => setConfirmArchive(programme),
                         },
                       ]}
                     />
@@ -391,13 +508,13 @@ function ProgrammesTab({
               );
             })}
 
-            {rows.length === 0 ? (
+            {rows.length === 0 && !list.isPending && !list.isError ? (
               <tr>
                 <td colSpan={8}>
                   <p className="console-empty m-0 py-6 text-center">
-                    {programmes.length === 0
-                      ? "No programmes yet. Add one to get started."
-                      : "No programmes match these filters."}
+                    {query || country || status
+                      ? "No programmes match these filters."
+                      : "No programmes yet. Add one to get started."}
                   </p>
                 </td>
               </tr>
@@ -408,9 +525,9 @@ function ProgrammesTab({
 
       <div className="console-pager">
         <span className="console-meta">
-          {shown.length === 0
+          {total === 0
             ? "Nothing to show"
-            : `Showing ${from + 1}–${Math.min(from + perPage, shown.length)} of ${shown.length} programmes`}
+            : `Showing ${from + 1}–${Math.min(from + perPage, total)} of ${total} programmes`}
         </span>
 
         <div className="ml-auto flex items-center gap-2">
@@ -418,8 +535,8 @@ function ProgrammesTab({
             type="button"
             className="console-page-btn"
             aria-label="Previous page"
-            disabled={current === 0}
-            onClick={() => setPage(current - 1)}
+            disabled={page === 0}
+            onClick={() => onPage(page - 1)}
           >
             ‹
           </button>
@@ -429,8 +546,8 @@ function ProgrammesTab({
               type="button"
               className="console-page-btn"
               aria-label={`Page ${i + 1}`}
-              aria-current={i === current ? "true" : undefined}
-              onClick={() => setPage(i)}
+              aria-current={i === page ? "true" : undefined}
+              onClick={() => onPage(i)}
             >
               {i + 1}
             </button>
@@ -439,8 +556,8 @@ function ProgrammesTab({
             type="button"
             className="console-page-btn"
             aria-label="Next page"
-            disabled={current >= pages - 1}
-            onClick={() => setPage(current + 1)}
+            disabled={page >= pages - 1}
+            onClick={() => onPage(page + 1)}
           >
             ›
           </button>
@@ -455,20 +572,17 @@ function ProgrammesTab({
             value: String(n),
             label: `${n} rows`,
           }))}
-          onChange={(v) => {
-            setPerPage(Number(v));
-            setPage(0);
-          }}
+          onChange={(v) => onPerPage(Number(v))}
         />
       </div>
 
       <Dialog
-        open={confirmDelete !== null}
-        onOpenChange={(open) => !open && setConfirmDelete(null)}
-        title="Delete this programme?"
+        open={confirmArchive !== null}
+        onOpenChange={(open) => !open && setConfirmArchive(null)}
+        title="Archive this programme?"
         description={
-          confirmDelete
-            ? `${confirmDelete.name} — ${confirmDelete.institution}. The agent will stop matching students against it.`
+          confirmArchive
+            ? `${confirmArchive.name} — ${confirmArchive.institution ?? "no institution"}. The agent will stop matching students against it.`
             : undefined
         }
         footer={
@@ -477,7 +591,7 @@ function ProgrammesTab({
               type="button"
               className="console-btn"
               data-variant="secondary"
-              onClick={() => setConfirmDelete(null)}
+              onClick={() => setConfirmArchive(null)}
             >
               Cancel
             </button>
@@ -486,23 +600,24 @@ function ProgrammesTab({
               className="console-btn"
               data-variant="primary"
               style={{ background: "var(--c-danger)" }}
+              disabled={archive.isPending}
               onClick={() => {
-                if (confirmDelete) deleteProgramme(confirmDelete.programme_id);
-                setConfirmDelete(null);
+                if (confirmArchive) archive.mutate(confirmArchive.id);
+                setConfirmArchive(null);
               }}
             >
-              Delete
+              {archive.isPending ? "Archiving…" : "Archive"}
             </button>
           </>
         }
       >
-        {/* Said plainly, because the opposite assumption is the dangerous one.
-            Somebody who believes this wrote to a shared catalogue will not
-            check afterwards. */}
+        {/* Said plainly, because "Delete" is what the button used to say and
+            somebody who believes the row is gone will not look for it. */}
         <p className="console-hint m-0">
-          This catalogue is demo data held for the current session only — there
-          is no programmes endpoint behind it yet. The row disappears from this
-          table and comes back when the page reloads.
+          Nothing is deleted. Past shortlists name this programme and the
+          dashboard rebuilds them from that record, so the row stays in the
+          database — it leaves this table, and the Archived filter brings it
+          back.
         </p>
       </Dialog>
     </>
@@ -584,11 +699,26 @@ function RulesTab({ programmes }: { programmes: Programme[] }) {
  * Both call sites now sit inside `.console`, so it is drawn in the console's
  * type rather than Organic's.
  */
+/** The least a row needs to be drawn as a rule.
+ *
+ * Structural rather than `Requirement`, because two callers hold two shapes:
+ * the fixture's `Requirement` (with `requirement_id`) and the catalogue
+ * API's, whose key is `fact_key` and whose id is a uuid. Widening the prop
+ * beats converting one into the other at each call site and beats a second
+ * copy of this grid.
+ */
+export interface RuleRow {
+  requirement_id?: string;
+  key: string;
+  rule: string;
+  description: string;
+}
+
 export function RuleGrid({
   requirements,
   onRemove,
 }: {
-  requirements: Programme["requirements"];
+  requirements: readonly RuleRow[];
   onRemove?: (index: number) => void;
 }) {
   return (
