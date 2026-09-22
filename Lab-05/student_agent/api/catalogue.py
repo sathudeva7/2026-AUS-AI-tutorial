@@ -10,6 +10,7 @@ each one so the client can say how old it is.
 
 from __future__ import annotations
 
+import logging
 import re
 
 from datetime import date, datetime
@@ -23,10 +24,15 @@ from pydantic_core.core_schema import ValidationInfo
 from api import new_router
 from auth import Principal, require_permission
 from envelope import ApiError, enveloped
+import extraction
+import research
+from exa import ExaError, fetch_contents
 from repositories import catalogue as catalogue_repo
-from services import geo
+from services import geo, pages
 from services.money import from_minor, to_minor
 from services.rules import validate_rule
+
+log = logging.getLogger(__name__)
 
 router = new_router(tags=["catalogue"])
 
@@ -345,6 +351,184 @@ _REQUIRED_TO_PUBLISH = [
     ("tuition_per_year_minor", "a tuition fee"),
     ("duration_months", "a duration"),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Reading a course page
+# ---------------------------------------------------------------------------
+#
+# The step before creating one: a counsellor pastes the university's own
+# course page and the form fills from it rather than from forty keystrokes.
+#
+# This half returns the page's TEXT. Turning that text into fields — each one
+# carrying the sentence it came from, per `web/src/features/catalogue/
+# extraction.ts` — is the next slice, and the shape of this response is what
+# it will be built on.
+#
+# No repository, because there is no row. `exa.py` is the data source here in
+# the same way `clerk.py` is for the roster: an outside service with its own
+# module, called from the route.
+
+
+def _worth_researching(exc: ExaError) -> bool:
+    """Is this a page that exists and is refusing us, or one that is gone?
+
+    An agent run costs thirty times what the fetch does, so it is not a
+    blanket retry. 404 is a link that will never work however it is read;
+    403 and 5xx are what a bot challenge looks like from the outside, and
+    those pages read perfectly well in a browser. A failure with no page
+    status at all is ours — a malformed url — and buys nothing either.
+    """
+    return exc.page_status is not None and exc.page_status != 404
+
+
+def _page_read(
+    url: str,
+    title: str | None,
+    text: str,
+    reading,
+    *,
+    researched: bool,
+) -> PageReadResponse:
+    return PageReadResponse(
+        url=url,
+        title=title,
+        text=text,
+        fields=reading.fields,
+        intakes=reading.intakes,
+        requirements=reading.requirements,
+        researched=researched,
+    )
+
+
+def _reader_unavailable(cause: Exception) -> ApiError:
+    """502, not 500: a third party failed, not us.
+
+    One helper for both halves of the read. Exa being down and the model
+    being rate limited are the same thing to the counsellor — wait and press
+    it again — and the same thing to an operator: look outside this service.
+    """
+    log.warning("page reader unavailable: %s", cause)
+    return ApiError(
+        http.HTTP_502_BAD_GATEWAY,
+        "PAGE_READER_UNAVAILABLE",
+        "Could not reach the page reader. Try again in a moment.",
+    )
+
+
+class PageReadRequest(BaseModel):
+    url: str
+
+
+class PageReadResponse(BaseModel):
+    """One course page, read and converted into catalogue values.
+
+    The models come from `extraction` and `services.pages` rather than being
+    restated here. They already are this shape, and a parallel set of nine
+    fields plus two lists would be a second place to change every time one
+    of them moves — the drift this route has no way to notice.
+    """
+
+    #: Where the fetch ENDED, which is not always what was asked for: course
+    #: pages redirect to the current year's entry. This is the page the text
+    #: came from, so it is the one worth recording against a programme.
+    url: str
+    title: str | None
+    #: The page as the reader saw it. Kept while the prompt is still being
+    #: tuned, so a thin extraction can be checked against what was actually
+    #: read instead of guessed at. A candidate to drop once it settles.
+    text: str
+
+    #: Each carrying the sentence it came from. Never a bare value: this is
+    #: the whole reason the reader is allowed to fill a form at all.
+    fields: extraction.ExtractedFields
+    intakes: list[pages.NormalisedIntake]
+    #: FREE TEXT, AND NOT SAVED. `programme_requirements` needs a `fact_key`
+    #: and a `rule`, and neither exists yet — so these are for the counsellor
+    #: to read while filling the requirements builder by hand. The screen has
+    #: to say so, or somebody saves the form and wonders where they went.
+    requirements: list[extraction.RequirementPoint]
+
+    #: True when the page refused to be fetched and the agent read it instead.
+    #:
+    #: The client must show this. Everything in a researched reading is
+    #: `unclear` and none of its quotes were checked against the page,
+    #: because there was no page text to check them against — and one or two
+    #: values may have come off a different website entirely. A counsellor
+    #: confirming these is doing something weaker than confirming a quote,
+    #: and has to know that before they do it.
+    researched: bool = False
+
+
+@router.post("/api/programmes/read")
+def read_programme_page(
+    body: PageReadRequest,
+    principal: Principal = Depends(require_permission("catalogue.write")),
+) -> PageReadResponse:
+    """Fetch a course page's text so the editor can be filled from it.
+
+    `catalogue.write` rather than a key of its own: this reads no catalogue
+    row, but its only purpose is to start writing one, and a permission that
+    let somebody read pages without being able to save the result would guard
+    nothing.
+
+    NOT HOST-FILTERED, deliberately and provisionally. The agent's web tools
+    go through `sources.programme_sources()` because the agent chooses its own
+    URLs unattended; here a counsellor chose the page and the result lands as
+    an unverified draft a human must confirm. Whether the curated allowlist
+    should apply anyway is an open product decision — if it does, it belongs
+    on this line, not inside `exa.py`, which is transport only.
+    """
+    researched = False
+    page = None
+    try:
+        page = fetch_contents(body.url)
+    except ExaError as exc:
+        if exc.retryable:
+            raise _reader_unavailable(exc) from exc
+        if not _worth_researching(exc):
+            # A dead link, or a link that is not one. Nothing else is worth
+            # trying and an agent run would bill for finding that out.
+            # `details` puts it against the box they can actually fix.
+            raise _invalid("url", str(exc)) from exc
+        # The page exists and is refusing crawlers — Cloudflare, mostly. The
+        # agent reads those, slower and dearer and with weaker evidence, so
+        # it runs here and nowhere else.
+        log.info("falling back to the research reader for %s (%s)", body.url, exc)
+        try:
+            reading = pages.normalise(research.research(body.url))
+        except ExaError as fallback_exc:
+            # Say why the FIRST one failed, not the second. "Kingston blocks
+            # readers" is the fact; "the agent also could not" is a detail of
+            # our recovery, and the counsellor's next move is the same either
+            # way — check the link, or fill it in by hand.
+            log.warning("research reader also failed for %s: %s", body.url, fallback_exc)
+            raise _invalid("url", str(exc)) from fallback_exc
+        researched = True
+
+    if page is None:
+        return _page_read(body.url, None, "", reading, researched=True)
+
+    try:
+        reading = pages.normalise(extraction.extract(page.text, url=page.url))
+    except extraction.PageTooLong as exc:
+        # The one extraction failure the counsellor can do something about.
+        raise _invalid(
+            "url",
+            "That page is too long to read. Try the course's own page rather "
+            "than a prospectus or a department listing.",
+        ) from exc
+    except extraction.ExtractionError as exc:
+        # Everything else here is ours — our key, our quota, our outage. None
+        # of it is a fact about the link, so it must not land on that field.
+        raise _reader_unavailable(exc) from exc
+
+    log.info(
+        "page read for tenant %s: %s (%d chars, $%.4f exa, %d/%d tokens)",
+        principal.tenant_id, page.url, len(page.text), page.cost,
+        reading.prompt_tokens, reading.completion_tokens,
+    )
+    return _page_read(page.url, page.title, page.text, reading, researched=researched)
 
 
 @router.post("/api/programmes", status_code=http.HTTP_201_CREATED)
