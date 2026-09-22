@@ -1936,11 +1936,15 @@
   display: inline-block;
 }
 
+/* Fixed, not absolute — see Menu.tsx. The table wrapper scrolls on both axes
+   (overflow-x: auto makes the y axis auto too), so an absolute list was
+   clipped by it, worst on the last row; a fixed box is laid out against the
+   viewport and no overflow ancestor touches it. It stays inside .console,
+   where --c-card and --c-line are defined. `top` and `left` are measured and
+   set inline, so there is nothing sensible to put here. */
 .console-menu-list {
-  position: absolute;
+  position: fixed;
   z-index: 30;
-  top: calc(100% + 4px);
-  right: 0;
   min-width: 168px;
   padding: 5px;
   border: 1px solid var(--c-line);
