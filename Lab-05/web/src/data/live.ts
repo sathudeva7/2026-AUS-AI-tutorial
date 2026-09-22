@@ -10,7 +10,7 @@
  */
 import { readSse } from "@/lib/sse";
 import { AGENT_BASE_URL } from "@/api/config";
-import { authHeaders, get, patch } from "@/api/client";
+import { authHeaders, get, patch, post } from "@/api/client";
 import { AgentUnreachableError } from "@/api/errors";
 import type { Briefing, Lead } from "./types";
 
@@ -104,27 +104,7 @@ export async function createLead(input: {
   email: string;
   country_of_residence?: string;
 }): Promise<Lead & { created: boolean }> {
-  let response: Response;
-  try {
-    response = await fetch(`${AGENT_BASE_URL}/api/leads`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-      body: JSON.stringify(input),
-    });
-  } catch (cause) {
-    throw new AgentUnreachableError(cause);
-  }
-  if (!response.ok) {
-    let detail = String(response.status);
-    try {
-      const body = (await response.json()) as { detail?: string };
-      if (body.detail) detail = body.detail;
-    } catch {
-      // Non-JSON error body; the status code is all we have.
-    }
-    throw new Error(detail);
-  }
-  return (await response.json()) as Lead & { created: boolean };
+  return post<Lead & { created: boolean }>("/api/leads", input);
 }
 
 // ---------------------------------------------------------------------------
