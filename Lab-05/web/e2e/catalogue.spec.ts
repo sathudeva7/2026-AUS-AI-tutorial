@@ -263,6 +263,49 @@ test("a duplicate is made by the server and opened", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/catalogue/${copy.id}$`));
 });
 
+test("the LAST row's menu is not clipped by the table", async ({ page }) => {
+  // The bug: the table is min-width 1000px inside overflow-x: auto, and CSS
+  // makes the other axis scroll along with it. The bottom row's menu opened
+  // downward into the wrapper's edge and was cut in half. The list is
+  // portalled to <body> now, so this asserts it is genuinely on screen —
+  // toBeVisible alone would pass on a clipped element.
+  await mockProgrammes(
+    page,
+    Array.from({ length: 8 }, (_, i) =>
+      programme({ id: `p${i}`, name: `Programme ${i}` }),
+    ),
+  );
+  await open(page);
+
+  await page.getByRole("button", { name: /Actions for Programme 7/ }).click();
+
+  const archive = page.getByRole("menuitem", { name: "Archive" });
+  await expect(archive).toBeVisible();
+
+  const box = await archive.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  // The whole item, not just its top edge — a half-clipped row is the bug.
+  expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+
+  // And it must be opaque. The first fix for the clipping moved the list to
+  // <body> with a portal, which put it outside the `.console` subtree the
+  // design tokens are defined on: --c-card resolved to nothing, the list
+  // came out with no background, and the table showed straight through the
+  // words. Geometry alone cannot see that, so the paint is asserted too.
+  // `el: any` because this config has no DOM lib — the same escape
+  // edit-contact.spec.ts uses for its one piece of in-page code.
+  const background: string = await page
+    .getByRole("menu")
+    .evaluate((el: any) =>
+      el.ownerDocument.defaultView.getComputedStyle(el).backgroundColor,
+    );
+  expect(background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(background).not.toBe("transparent");
+});
+
 test("the row menu closes on Escape", async ({ page }) => {
   await mockProgrammes(page, [programme({ name: "MSc Data Science" })]);
   await open(page);
