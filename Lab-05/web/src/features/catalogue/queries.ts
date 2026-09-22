@@ -28,6 +28,7 @@ import {
   listProgrammes,
   patchProgramme,
   putIntakes,
+  readProgrammePage,
   putRequirements,
   verifyProgramme,
 } from "./api";
@@ -151,5 +152,19 @@ export function useVerifyProgramme() {
       client.setQueryData(catalogueKeys.detail(detail.id), detail);
       void client.invalidateQueries({ queryKey: catalogueKeys.lists() });
     },
+  });
+}
+
+/** Read a course page into form fields.
+ *
+ * A mutation, though it writes nothing. Two reasons, and the second is the
+ * one that matters: it spends money on every call, so it must never be a
+ * query that the cache can refetch on a remount, a window focus or a
+ * reconnect. Nothing is invalidated afterwards — no row changed, and the
+ * result goes into the editor's own state for a person to confirm.
+ */
+export function useReadProgrammePage() {
+  return useMutation({
+    mutationFn: (url: string) => readProgrammePage(url),
   });
 }

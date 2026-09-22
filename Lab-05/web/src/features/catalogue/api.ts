@@ -5,6 +5,8 @@
  */
 import { get, getWithMeta, patch, post, put } from "@/api/client";
 
+import type { Extraction } from "./extraction";
+
 import type {
   IntakeRow,
   ProgrammeCounts,
@@ -141,4 +143,15 @@ export async function putRequirements(
  *  see it. A different permission from editing, deliberately. */
 export async function verifyProgramme(id: string): Promise<ProgrammeDetail> {
   return post<ProgrammeDetail>(`/api/programmes/${id}/verify`);
+}
+
+/** `POST /api/programmes/read` — a course page, read into form fields.
+ *
+ * Writes nothing. It is a POST because the url goes in a body rather than a
+ * query string, and it costs money each time — two paid calls on the server,
+ * a fetch and a reading — so it is never a query the cache may repeat on its
+ * own. The caller drives it as a mutation.
+ */
+export async function readProgrammePage(url: string): Promise<Extraction> {
+  return post<Extraction>("/api/programmes/read", { url });
 }

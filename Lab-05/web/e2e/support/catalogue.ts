@@ -309,3 +309,88 @@ export async function mockProgrammeWrites(
   );
   return writes;
 }
+
+// ---------------------------------------------------------------------------
+// The page reader
+// ---------------------------------------------------------------------------
+
+type Ev = "quoted" | "unclear" | "absent";
+
+export function sourced(value: string | null, evidence: Ev = "quoted", quote = "the page says so") {
+  return evidence === "absent"
+    ? { value: null, evidence, quote: null, section: null }
+    : { value, evidence, quote, section: null };
+}
+
+/** An extraction shaped exactly as `POST /api/programmes/read` sends one.
+ *
+ * NORMALISED, because the server normalises: `level` arrives as "masters",
+ * never "MSc", and `country` as "GB". A fixture that carried the page's own
+ * wording would be testing a conversion the client is not allowed to do.
+ */
+export function extraction(overrides: Record<string, unknown> = {}) {
+  return {
+    url: "https://www.bristol.ac.uk/study/postgraduate/taught/msc-data-science/",
+    title: "MSc Data Science | Study at Bristol",
+    text: "MSc Data Science\nOverseas: £37,900 per year",
+    fields: {
+      name: sourced("MSc Data Science", "quoted", "MSc Data Science"),
+      institution: sourced("University of Bristol"),
+      country: sourced("GB", "quoted", "Bristol, United Kingdom"),
+      city: sourced(null, "absent"),
+      level: sourced("masters", "quoted", "Awards available: MSc"),
+      field: sourced("Data Science"),
+      tuition_per_year: sourced("37900", "quoted", "Overseas: £37,900 per year"),
+      currency: sourced("GBP", "quoted", "Overseas: £37,900 per year"),
+      duration_months: sourced("12", "quoted", "One year full-time"),
+    },
+    intakes: [],
+    requirements: [],
+    researched: false,
+    ...overrides,
+  };
+}
+
+export async function mockPageRead(
+  page: Page,
+  result: Record<string, unknown>,
+) {
+  await page.route("**/api/programmes/read", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true, data: result, request_id: "req_test" }),
+    }),
+  );
+}
+
+/** Refuse the read. `field` puts it against the url box, as a 422 does;
+ *  leaving it off is the 502 an outage sends, which must NOT be. */
+export async function mockPageReadFailure(
+  page: Page,
+  {
+    status = 502,
+    code = "PAGE_READER_UNAVAILABLE",
+    message = "Could not reach the page reader. Try again in a moment.",
+    issue = "",
+    // Which field the detail is against. `url` is the counsellor's to fix;
+    // a permission refusal carries `permission`, which no form has a box for.
+    field = "url",
+  } = {},
+) {
+  await page.route("**/api/programmes/read", (route) =>
+    route.fulfill({
+      status,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: false,
+        error: {
+          code,
+          message,
+          ...(issue ? { details: [{ field, issue }] } : {}),
+        },
+        request_id: "req_test",
+      }),
+    }),
+  );
+}

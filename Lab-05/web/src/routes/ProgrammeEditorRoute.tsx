@@ -41,11 +41,12 @@ import { COUNTRIES } from "@/data/countries";
 import { levelLabel } from "@/features/catalogue/display";
 import { ProgrammeStart } from "@/features/catalogue/components/ProgrammeStart";
 import { SourcedField } from "@/features/catalogue/components/SourcedField";
-import type {
-  ExtractedKey,
-  Extraction,
-  ProposedIntake,
-  ProposedRequirement,
+import {
+  hostOf,
+  type ExtractedKey,
+  type Extraction,
+  type ProposedIntake,
+  type RequirementPoint,
 } from "@/features/catalogue/extraction";
 import {
   useProgrammeDetail,
@@ -419,7 +420,19 @@ function ProgrammeForm({
   const [proposedIntakes, setProposedIntakes] = useState<ProposedIntake[]>(
     extraction?.intakes ?? [],
   );
-  const [proposedRules, setProposedRules] = useState<ProposedRequirement[]>(
+  /** What the page said about entry, for a person to read.
+   *
+   * NOT proposals any more, and nothing here can be accepted: these carry no
+   * `fact_key` and no `rule`, so there is nothing to put in the requirements
+   * grid and nowhere in `programme_requirements` for them to go. Turning
+   * prose into a threshold is its own piece of work.
+   *
+   * They are still worth showing. Most of what a course page states has no
+   * threshold form at all — a portfolio, two references, two years of work —
+   * and the alternative to reading them here is reading them in the other
+   * tab, which is the tab this feature exists to close.
+   */
+  const [pagePoints, setPagePoints] = useState<RequirementPoint[]>(
     extraction?.requirements ?? [],
   );
 
@@ -562,44 +575,33 @@ function ProgrammeForm({
     });
   }
 
-  /** Take one proposed intake into the draft, and stop offering it. */
+  /** Take one proposed intake into the draft, and stop offering it.
+   *
+   * Only ever called for a proposal whose year the page actually gave —
+   * `intake` is null otherwise and the button is disabled, because the
+   * column is char(7) and there is no month to store without one. Offering
+   * "September" and quietly filing it under this year is exactly the
+   * invention the quote beside it is meant to prevent.
+   */
   function acceptIntake(proposal: ProposedIntake) {
-    setProposedIntakes((held) =>
-      held.filter((i) => i.intake !== proposal.intake),
-    );
-    if (draft.intakes.some((i) => i.intake === proposal.intake)) return;
+    const month = proposal.intake;
+    if (!month) return;
+    setProposedIntakes((held) => held.filter((i) => i !== proposal));
+    if (draft.intakes.some((i) => i.intake === month)) return;
     patch({
       intakes: [
         ...draft.intakes,
         {
-          intake: proposal.intake,
-          application_deadline: proposal.application_deadline,
+          intake: month,
+          // The ISO date the server parsed, not the page's wording. "Friday
+          // 30 July 2027" is not a date this form can store.
+          application_deadline: proposal.deadline_date,
           // Open unless the page said otherwise, which is the same default the
           // manual chips use. A closed intake is a claim of its own and the
           // reader is not allowed to make it.
           is_open: true,
         },
       ].sort((a, b) => a.intake.localeCompare(b.intake)),
-    });
-  }
-
-  /** Take one proposed requirement. Appended, not inserted by key — order is
-   *  content here, and the order the page listed them in is the order a
-   *  student reads them. */
-  function acceptRule(index: number) {
-    const proposal = proposedRules[index];
-    if (!proposal) return;
-    setProposedRules((held) => held.filter((_, i) => i !== index));
-    patch({
-      requirements: [
-        ...draft.requirements,
-        {
-          fact_key: proposal.fact_key,
-          rule: proposal.rule,
-          description: proposal.description,
-          mandatory: true,
-        },
-      ],
     });
   }
 
@@ -730,9 +732,27 @@ function ProgrammeForm({
                     } to check`
                   : "Everything read off the page is confirmed"}
               </div>
+              {/* The one thing a counsellor must not miss. A researched
+                  reading looks exactly like a read one on screen — same
+                  boxes, same confirm ticks — and it is not the same claim:
+                  no quote was checked against the page, because the page
+                  refused to be fetched and there was no text to check
+                  against. Some universities sit behind a bot challenge and
+                  this is the only way to read them at all; the answer is to
+                  say so, not to hide it behind an identical form. */}
+              {extraction.researched ? (
+                <p className="console-error" role="status">
+                  <AlertIcon size={14} />{" "}
+                  {hostOf(extraction.url)} blocks direct reading, so this was
+                  researched rather than quoted. Nothing here was checked
+                  against the page, and a value may have come from another
+                  site — each one shows where. Verify every figure yourself
+                  before publishing.
+                </p>
+              ) : null}
               <p className="console-review-sub">
                 Read from{" "}
-                <span className="console-review-src">{extraction.source}</span>.
+                <span className="console-review-src">{hostOf(extraction.url)}</span>.
                 Each value shows the line it came from — confirm it, or type
                 over it.
                 {notOnPage.length
@@ -961,24 +981,30 @@ function ProgrammeForm({
                       {proposedIntakes.length === 1 ? "" : "s"} on that page
                     </span>
                   </div>
-                  {proposedIntakes.map((proposal) => (
-                    <div key={proposal.intake} className="console-proposal">
+                  {proposedIntakes.map((proposal, index) => {
+                    /* Keyed by position, not by `intake`: two proposals can
+                       both be missing their year, and null is not a key. */
+                    const label = proposal.intake
+                      ? formatIntake(proposal.intake)
+                      : (proposal.month ?? "An intake");
+                    return (
+                    <div key={index} className="console-proposal">
                       <div className="console-proposal-body">
                         <div className="console-proposal-head">
-                          <span className="console-rule-key">
-                            {formatIntake(proposal.intake)}
-                          </span>
+                          <span className="console-rule-key">{label}</span>
                           <span className="console-rule-note">
-                            {proposal.application_deadline
-                              ? `Closes ${formatDate(proposal.application_deadline)}`
-                              : "No deadline on the page"}
+                            {proposal.deadline_date
+                              ? `Closes ${formatDate(proposal.deadline_date)}`
+                              : proposal.application_deadline
+                                ? `Closes ${proposal.application_deadline}`
+                                : "No deadline on the page"}
                           </span>
-                          {proposal.evidence === "unclear" ? (
+                          {proposal.intake ? null : (
                             <span className="console-unclear">
                               <AlertIcon size={13} />
-                              No year beside it — this is a guess
+                              The page gave no year — add it by hand below
                             </span>
-                          ) : null}
+                          )}
                         </div>
                         <p className="console-quote">
                           <span className="console-quote-words">
@@ -987,9 +1013,20 @@ function ProgrammeForm({
                         </p>
                       </div>
                       <div className="console-proposal-actions">
+                        {/* An intake with no year cannot be stored: the
+                            column is a month, and picking one for the
+                            counsellor is the guess this whole screen is
+                            built to avoid. The quote stays on screen so they
+                            can read the year off the page themselves. */}
                         <button
                           type="button"
                           className="console-proposal-add"
+                          disabled={!proposal.intake}
+                          title={
+                            proposal.intake
+                              ? undefined
+                              : "Pick the year in the intake chips below"
+                          }
                           onClick={() => acceptIntake(proposal)}
                         >
                           <PlusIcon size={12} />
@@ -999,10 +1036,10 @@ function ProgrammeForm({
                           type="button"
                           className="console-icon-btn"
                           data-variant="ghost"
-                          aria-label={`Dismiss the ${formatIntake(proposal.intake)} intake`}
+                          aria-label={`Dismiss the ${label} intake`}
                           onClick={() =>
                             setProposedIntakes((held) =>
-                              held.filter((i) => i.intake !== proposal.intake),
+                              held.filter((_, i) => i !== index),
                             )
                           }
                         >
@@ -1010,7 +1047,8 @@ function ProgrammeForm({
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : null}
 
@@ -1153,68 +1191,59 @@ function ProgrammeForm({
                   entry condition no human wrote, and it fails students on
                   every shortlist it touches without anybody being asked. So
                   each shows the sentence behind it and waits to be taken. */}
-              {proposedRules.length ? (
-                <div className="console-proposals">
+              {pagePoints.length ? (
+                <div className="console-proposals" data-variant="reference">
                   <div className="console-proposals-head">
                     <span>
-                      {proposedRules.length} requirement
-                      {proposedRules.length === 1 ? "" : "s"} read off that page
+                      What that page says about entry ({pagePoints.length})
                     </span>
+                    {/* Said plainly, because the alternative is a counsellor
+                        filling nothing in, pressing save, and finding the
+                        requirements gone. These have no fact_key and no rule,
+                        so there is nowhere in programme_requirements to put
+                        them — they are here to be read while the grid below
+                        is filled in. */}
                     <span className="console-rule-note">
-                      Add the ones that are right. Nothing here is added for
-                      you.
+                      Read from the page, not saved. Use it to build the
+                      requirements below.
                     </span>
                   </div>
-                  {proposedRules.map((proposal, index) => (
-                    <div
-                      key={`${proposal.fact_key}-${proposal.rule}`}
-                      className="console-proposal"
-                    >
+                  {pagePoints.map((point, index) => (
+                    <div key={index} className="console-proposal">
                       <div className="console-proposal-body">
                         <div className="console-proposal-head">
-                          <span className="console-rule-key">
-                            {proposal.fact_key.replace(/_/g, " ")}
-                          </span>
-                          <span className="console-rule-expr">
-                            {proposal.rule}
-                          </span>
-                          {proposal.evidence === "unclear" ? (
+                          {point.section ? (
+                            <span className="console-rule-key">
+                              {point.section}
+                            </span>
+                          ) : null}
+                          {point.evidence === "unclear" ? (
                             <span className="console-unclear">
                               <AlertIcon size={13} />
                               The page is not specific
                             </span>
                           ) : null}
                         </div>
-                        <p className="console-rule-note mt-1">
-                          {proposal.description}
-                        </p>
-                        <p className="console-quote">
-                          <span className="console-quote-words">
-                            {proposal.quote}
-                          </span>{" "}
-                          {proposal.section ? (
-                            <span className="console-quote-where">
-                              — {proposal.section}
+                        <p className="console-rule-note mt-1">{point.text}</p>
+                        {/* Shown only where the tidied line and the page's
+                            own words differ — otherwise it is the same
+                            sentence printed twice. */}
+                        {point.quote && point.quote !== point.text ? (
+                          <p className="console-quote">
+                            <span className="console-quote-words">
+                              {point.quote}
                             </span>
-                          ) : null}
-                        </p>
+                          </p>
+                        ) : null}
                       </div>
                       <div className="console-proposal-actions">
                         <button
                           type="button"
-                          className="console-proposal-add"
-                          onClick={() => acceptRule(index)}
-                        >
-                          <PlusIcon size={12} />
-                          Add
-                        </button>
-                        <button
-                          type="button"
                           className="console-icon-btn"
                           data-variant="ghost"
-                          aria-label={`Dismiss the ${proposal.rule} requirement`}
+                          aria-label={`Dismiss "${point.text ?? "this note"}"`}
                           onClick={() =>
-                            setProposedRules((held) =>
+                            setPagePoints((held) =>
                               held.filter((_, i) => i !== index),
                             )
                           }
@@ -1227,10 +1256,12 @@ function ProgrammeForm({
                 </div>
               ) : null}
 
-              {/* Hidden while proposals are on screen: the grid's empty state
-                  says "no entry requirements", which under four unread
-                  proposals is a contradiction rather than a prompt. */}
-              {proposedRules.length && !draft.requirements.length ? null : (
+              {/* The grid always shows now. Its empty state used to be hidden
+                  under unread proposals, which was a contradiction — but
+                  these points cannot become requirements on their own, so
+                  "no entry requirements yet" is the true and useful thing to
+                  say beside them. */}
+              {(
               <RuleGrid
                 requirements={draft.requirements.map((r, i) => ({
                   requirement_id: r.id ?? `new-${i}`,
