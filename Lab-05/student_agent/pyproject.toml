@@ -30,6 +30,12 @@ dependencies = [
     # pulls in the RSA backend RS256 needs.
     "pyjwt[crypto]>=2.8",
 
+    # Exa's agent, used ONLY when a page refuses to be fetched. A large share
+    # of UK universities sit behind a bot challenge that answers Exa's
+    # crawler with a 500; the agent reads them. The /contents call on the
+    # primary path is plain httpx and needs no SDK — see student_agent/exa.py.
+    "exa-py>=2.22",
+
     # Real validation for reference data. An E.164 regex only checks the
     # SHAPE of a number: '+947424059777' passes it and is not a real Sri
     # Lankan number. libphonenumber knows how long an LK mobile actually is,
